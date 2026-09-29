@@ -192,6 +192,19 @@ results at 50 rows. Postgres is never queried with model-written SQL. Flow as in
 → answer as UI components (optionally one follow-up query); ids are swapped back to names and our own avatar
 URLs server-side.
 
+**Training map.** Apple Maps (MapKit JS). All stored routes of the last 12 months are drawn as translucent
+polylines, so repeated streets glow — a heat map without a heat-map layer. On top, each runner's newest run
+is animated at 30× real time; runs that started within 20 minutes and 500 m of each other share a group, run
+on the same clock and are offset a few pixels so a group run looks like a group run. Hovering a runner shows
+date, distance, pace and duration. The avatar lives in `RunnerSprite.tsx` — swap the `<img>` for a sprite sheet
+and nothing else changes. Only routes of runs shared with everyone exist in the database, already trimmed.
+
+**Apple Maps key.** Create it at [developer.apple.com/account](https://developer.apple.com/account) → Certificates,
+Identifiers & Profiles → Services → Maps → Configure. Either copy a MapKit JS token into `APPLE_MAPS_TOKEN`,
+or download the Maps `.p8` key and set `APPLE_MAPS_TEAM_ID`, `APPLE_MAPS_KEY_ID` and `APPLE_MAPS_PRIVATE_KEY`
+(file contents, newlines as `\n`) so the backend mints short-lived tokens bound to `APP_BASE_URL`. Put it in
+`.env` locally and in `/opt/raceday/.env` on the server — the key never reaches the browser, only the token does.
+
 ---
 
 ## Environment
@@ -204,6 +217,8 @@ URLs server-side.
 | `OPENAI_TEXT_MODEL` | Coach / Ask AI model, default `gpt-5.4-mini` |
 | `TOKEN_ENCRYPTION_KEY` | Encrypts Strava tokens at rest |
 | `SESSION_SECRET` | Signs member session cookies |
+| `APPLE_MAPS_TOKEN` | Training map: ready-made MapKit JS token from the Apple Developer portal |
+| `APPLE_MAPS_TEAM_ID` / `APPLE_MAPS_KEY_ID` / `APPLE_MAPS_PRIVATE_KEY` | Alternative: Maps `.p8` key, backend signs 30-minute tokens |
 | `DATABASE_URL` | Postgres connection |
 | `APP_BASE_URL` | Used for OAuth redirect and share links |
 

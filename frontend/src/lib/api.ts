@@ -77,6 +77,25 @@ export interface AskResponse {
   remaining: number
 }
 
+export interface Track {
+  name: string
+  avatar_url: string | null
+  avatar_is_generated: boolean
+  date: string
+  distance_km: number
+  duration_s: number
+  pace_seconds_km: number | null
+  group: number
+  path: [number, number][]
+}
+
+export interface TeamMap {
+  days: number
+  generated_at: string
+  heat: [number, number][][]
+  tracks: Track[]
+}
+
 export interface Coach {
   source: "ai" | "coach"
   generated_at: string | null
@@ -124,6 +143,7 @@ export const api = {
   },
   deleteAvatar: () => request<void>("/avatars/me", { method: "DELETE" }),
   getTeam: (id: string) => request<Team>(`/teams/${encodeURIComponent(id)}`),
+  teamMap: (id: string) => request<TeamMap>(`/teams/${encodeURIComponent(id)}/map`),
   createTeam: (body: TeamCreate) =>
     request<{ id: string }>("/teams", { method: "POST", body: JSON.stringify(body) }),
   updateMembership: (id: string, body: Partial<Viewer>) =>
