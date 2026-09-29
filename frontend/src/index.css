@@ -457,12 +457,12 @@ body {
   to { transform: rotate(-88deg); }
 }
 @keyframes rig-shoulder {
-  from { transform: rotate(48deg); }
-  to { transform: rotate(-40deg); }
+  from { transform: rotate(-28deg); }
+  to { transform: rotate(34deg); }
 }
 @keyframes rig-elbow {
-  from { transform: rotate(-48deg); }
-  to { transform: rotate(-104deg); }
+  from { transform: rotate(62deg); }
+  to { transform: rotate(100deg); }
 }
 
 /* ── Apple AI Shimmer (same as SIU) ── */
