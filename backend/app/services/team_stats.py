@@ -1,3 +1,4 @@
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -6,7 +7,7 @@ from math import log2
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Activity, ActivityDetail, Athlete, Avatar, Membership, Team
+from app.models import Activity, ActivityDetail, Athlete, Avatar, CardImage, Membership, Team
 from app.schemas.teams import HighlightsOut, MemberOut, RunOut, StatCardOut
 from app.services import team_cache
 
@@ -27,6 +28,8 @@ FRESH_DAYS = 28
 STALE_PENALTY_PER_WEEK = 0.004
 MAX_STALE_PENALTY = 0.05
 EIFFEL_TOWER_M = 330
+# Cards about a single runner that get AI artwork of their avatar
+ART_CARDS = ("longest", "endurance", "fastest_km", "climber", "volume", "missing")
 
 
 @dataclass
@@ -47,6 +50,7 @@ class TeamView:
     members: list[tuple[int, MemberOut]]
     highlights: HighlightsOut
     facts: dict[int, dict]
+    art_wanted: list[tuple[int, str]] = field(default_factory=list)
 
 
 def pace_seconds_km(distance_m: float, seconds: int) -> int | None:
@@ -192,7 +196,33 @@ def stat_cards(window_runs: dict[str, list[Run]], race_distance_m: int) -> list[
     return cards
 
 
-def summarize(team: Team, rows: list[tuple], runs_by_athlete: dict[int, list[Run]], now: datetime) -> TeamView:
+def _attach_card_art(
+    team: Team,
+    cards: list[StatCardOut],
+    athlete_ids: dict[str, int],
+    stored: dict[tuple[int, str], uuid.UUID],
+) -> list[tuple[int, str]]:
+    """Link cached artwork to its card and report the pairs that still need one."""
+    wanted = []
+    for card in cards:
+        athlete_id = athlete_ids.get(card.detail) if card.key in ART_CARDS else None
+        if athlete_id is None:
+            continue
+        image_id = stored.get((athlete_id, card.key))
+        if image_id:
+            card.image_url = f"/api/v1/teams/{team.id}/cards/{image_id}"
+        else:
+            wanted.append((athlete_id, card.key))
+    return wanted
+
+
+def summarize(
+    team: Team,
+    rows: list[tuple],
+    runs_by_athlete: dict[int, list[Run]],
+    now: datetime,
+    card_art: dict[tuple[int, str], uuid.UUID] | None = None,
+) -> TeamView:
     window_start = now - WINDOW
     race_ahead = team.race_date >= now.date()
     members: list[tuple[int, MemberOut]] = []
@@ -243,13 +273,15 @@ def summarize(team: Team, rows: list[tuple], runs_by_athlete: dict[int, list[Run
         }
 
     all_recent = [r for rs in window_runs.values() for r in rs]
+    cards = stat_cards(window_runs, team.race_distance_m)
+    art_wanted = _attach_card_art(team, cards, {m.name: athlete_id for athlete_id, m in members}, card_art or {})
     highlights = HighlightsOut(
         window_days=WINDOW.days,
         total_km=round(sum(r.distance_m for r in all_recent) / 1000, 1),
         total_runs=len(all_recent),
-        cards=stat_cards(window_runs, team.race_distance_m),
+        cards=cards,
     )
-    return TeamView(members=members, highlights=highlights, facts=facts)
+    return TeamView(members=members, highlights=highlights, facts=facts, art_wanted=art_wanted)
 
 
 async def load_team_view(db: AsyncSession, team: Team, use_cache: bool = True) -> TeamView:
@@ -291,6 +323,14 @@ async def load_team_view(db: AsyncSession, team: Team, use_cache: bool = True) -
     for athlete_id, start, distance, moving, elevation, kudos, efforts, prs in result:
         runs_by_athlete[athlete_id].append(Run(start, distance, moving, elevation, kudos or 0, efforts or [], prs or 0))
 
-    view = summarize(team, rows, runs_by_athlete, now)
+    art = {
+        (athlete_id, key): image_id
+        for athlete_id, key, image_id in await db.execute(
+            select(CardImage.athlete_id, CardImage.card_key, CardImage.id).where(
+                CardImage.athlete_id.in_([a.id for a, _, _ in rows])
+            )
+        )
+    }
+    view = summarize(team, rows, runs_by_athlete, now, art)
     team_cache.put(team.id, view)
     return view

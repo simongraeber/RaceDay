@@ -165,9 +165,23 @@ body {
   border-block: 1px solid var(--border);
 }
 
-.week-tile {
+.week-row {
   display: flex;
-  min-height: 146px;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.week-tile {
+  position: relative;
+  display: flex;
+  min-height: 168px;
+  width: 15rem;
+  flex: 0 0 15rem;
+  scroll-snap-align: start;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
@@ -175,6 +189,17 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--foreground);
+}
+.week-tile-art {
+  position: absolute;
+  right: -1.25rem;
+  bottom: -0.5rem;
+  height: 108%;
+  width: auto;
+  opacity: 0.85;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to left, #000 45%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 45%, transparent 100%);
 }
 .week-tile--0 { background: linear-gradient(130deg, #fff0dc, #ffe2cc); }
 .week-tile--1 { background: linear-gradient(130deg, #e0f2e7, #d3e9e3); }

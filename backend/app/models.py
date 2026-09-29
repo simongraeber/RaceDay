@@ -120,6 +120,22 @@ class ActivityDetail(Base):
     streams: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
+class CardImage(Base):
+    """AI artwork of a runner's avatar for one highlight card, generated once and reused."""
+
+    __tablename__ = "card_images"
+
+    athlete_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("athletes.id", ondelete="CASCADE"), primary_key=True
+    )
+    card_key: Mapped[str] = mapped_column(String, primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False
+    )
+    image: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class TeamCoachNote(Base):
     __tablename__ = "team_coach_notes"
 
