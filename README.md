@@ -24,7 +24,7 @@ Evaluated against the current Strava API v3 docs.
 | Want | Possible? |
 | --- | --- |
 | Read all activities of a club/group | **No.** Strava removed `/clubs/{id}/activities` and `/clubs/{id}/members` for third-party apps. Only `GET /clubs/{id}` (metadata) and `GET /athlete/clubs` remain. |
-| Read an athlete's own activities | **Yes** — `GET /athlete/activities`, scope `activity:read`. |
+| Read an athlete's own activities | **Yes** — `GET /athlete/activities`, scope `activity:read` (public runs only) or `activity:read_all` (also followers-only and "Only You"). |
 | Route geometry for the map | **Yes** — `map.summary_polyline` on each activity, or `GET /activities/{id}/streams` for `latlng`. |
 | Splits, pace, HR, elevation | **Yes** — `DetailedActivity`, `splits_metric`, streams. |
 | Stay fresh automatically | **Yes** — webhooks on activity create/update. |
@@ -77,7 +77,12 @@ There is no official Strava MCP server. A small internal MCP server wrapping our
 - **Members** log in once via Strava; we then set our own `httpOnly` session cookie so they can manage visibility or leave.
 - Returning members use `approval_prompt=auto` and skip the Strava consent screen.
 
-**Scope: `read,activity:read`** — not `read_all`. `activity:read` excludes private activities *and* privacy-zone data, which is what we want for a public map. We additionally trim the first/last ~200 m of every route.
+**Scope: `read,activity:read_all`** — needed because `activity:read` only returns runs shared with *everyone*;
+teams where members run privately or followers-only would otherwise look empty. `read_all` also disables Strava's
+privacy-zone masking, so we compensate: routes and GPS streams are stored **only for runs shared with everyone**,
+and the first/last ~400 m of those is trimmed. Non-public runs contribute numbers only (distance, time, elevation,
+splits, best efforts) and are shown on the team page like any other run — members are told this before connecting
+and can hide themselves at any time. Members who connected under the old scope see a "Reconnect Strava" prompt.
 
 ### Create a team
 
@@ -157,7 +162,7 @@ Team (uuid, name, race_name, race_date, race_distance_m, created_by)
 Athlete (strava_id, name, avatar, scope, refresh_token_enc, access_token_enc, expires_at)
   └── Avatar (athlete_id, uuid, generated_image)  -- optional, original photo discarded
   └── Activity (athlete_id, strava_id, start_date, distance, moving_time,
-                elevation, summary_polyline)  -- start/end trimmed
+                elevation, summary_polyline)  -- public runs only, start/end trimmed
         └── ActivityDetail (best_efforts, splits, kudos, pr_count, streams)  -- trimmed, no heart rate
 TeamCoachNote (team_id, generated_at, notes)  -- AI roasts, refreshed ≤ every 12 h
 ```

@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.database import async_session
 from app.models import Activity, ActivityDetail, Athlete
 from app.services import strava, team_cache
-from app.services.sync import TRIM_METERS
+from app.services.sync import TRIM_METERS, is_public
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +73,12 @@ async def enrich_batch(limit: int = BATCH) -> int:
                     tokens[athlete_id] = await strava.get_access_token(db, await db.get(Athlete, athlete_id))
                 try:
                     detail = await strava.get_activity(tokens[athlete_id], activity_id)
-                    streams = await strava.get_activity_streams(tokens[athlete_id], activity_id) if detail else None
+                    # Only runs shared with everyone contribute GPS data
+                    streams = (
+                        await strava.get_activity_streams(tokens[athlete_id], activity_id)
+                        if detail and is_public(detail)
+                        else None
+                    )
                 except strava.Unauthorized:
                     detail = streams = None
             except strava.RateLimited:

@@ -24,7 +24,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
 
 const ERRORS: Record<string, string> = {
   access_denied: "Strava access was cancelled.",
-  missing_scope: "RaceDay needs permission to read your activities.",
+  missing_scope: "RaceDay needs permission to read your activities, including the private ones.",
   login_failed: "Login failed. Please try again.",
 }
 

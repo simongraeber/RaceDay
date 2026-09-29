@@ -41,16 +41,16 @@ export default function PrivacyPage() {
         <ul>
           <li>Your Strava athlete ID, first name, last name, and profile picture URL</li>
           <li>
-            Your runs from the last 12 months that are visible to Everyone or Followers: date,
-            distance, duration, elevation, kilometre splits, best efforts, kudos count, and the
-            GPS track (downsampled)
+            Your runs from the last 12 months — including those you share only with followers or keep
+            private on Strava: date, distance, duration, elevation, kilometre splits, best efforts and
+            kudos count. The GPS track is stored only for runs you share with everyone.
           </li>
           <li>Access tokens, stored encrypted, so we can receive new runs automatically</li>
         </ul>
         <p>
-          We never read activities set to "Only Me" or your Strava privacy zones, and we never store
-          heart-rate data. We additionally remove the first and last 200 metres of every route and
-          GPS track before storing it.
+          Private and followers-only runs count towards your team's statistics and are shown there like
+          any other run, so only connect if you are comfortable with that. We never store heart-rate data,
+          and we remove the first and last 400 metres of every route and GPS track before storing it.
         </p>
 
         <h2>5. Optional AI avatar</h2>

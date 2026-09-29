@@ -73,7 +73,7 @@ async def strava_callback(
     back = f"/t/{team_id}" if team_id else "/"
     if error or not code:
         return _redirect(f"{back}?error=access_denied")
-    if "activity:read" not in scope.split(","):
+    if "activity:read_all" not in scope.split(","):
         return _redirect(f"{back}?error=missing_scope")
 
     try:
@@ -91,6 +91,7 @@ async def strava_callback(
     athlete.lastname = profile.get("lastname") or ""
     avatar = profile.get("profile_medium") or ""
     athlete.avatar_url = avatar if avatar.startswith("https://") else None
+    scope_upgraded = "activity:read_all" not in athlete.scope.split(",")
     athlete.scope = scope
     strava.store_tokens(athlete, tokens)
 
@@ -108,11 +109,14 @@ async def strava_callback(
         else:
             if await db.get(Membership, (team.id, athlete.id)) is None:
                 db.add(Membership(team_id=team.id, athlete_id=athlete.id))
-            target = f"/t/{team.id}?joined=1"
+                target = f"/t/{team.id}?joined=1"
+            else:
+                target = f"/t/{team.id}"
     await db.commit()
     team_cache.clear()
 
-    if athlete.last_synced_at is None:
+    # A scope upgrade makes previously invisible runs readable, so re-import the history
+    if athlete.last_synced_at is None or scope_upgraded:
         background.add_task(sync.backfill, athlete.id)
 
     resp = _redirect(target)

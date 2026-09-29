@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from app.models import Athlete, Membership, Team
 from app.services.enrich import detail_values, trim_streams
+from app.services.sync import is_public
 from app.services.team_stats import Run, pace_seconds_km, predict_finish, race_efforts, summarize
 
 NOW = datetime(2026, 9, 30, 12, tzinfo=timezone.utc)  # a Wednesday
@@ -66,6 +67,13 @@ class TeamStatsTests(unittest.TestCase):
 
 
 class EnrichTests(unittest.TestCase):
+    def test_only_runs_shared_with_everyone_are_public(self):
+        self.assertTrue(is_public({"visibility": "everyone"}))
+        self.assertTrue(is_public({}))
+        self.assertFalse(is_public({"visibility": "followers_only"}))
+        self.assertFalse(is_public({"visibility": "only_me"}))
+        self.assertFalse(is_public({"visibility": "everyone", "private": True}))
+
     def test_streams_are_trimmed_and_downsampled(self):
         distance = list(range(0, 2001, 10))
         raw = {
