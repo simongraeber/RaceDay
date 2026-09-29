@@ -168,6 +168,14 @@ served from Postgres through a 2-minute in-process cache that is cleared on ever
 
 Teams are not publicly listed. The authenticated `/teams/mine` endpoint only lists the caller's teams.
 
+**Ask AI agent.** Members can ask questions about the team's runs (5 per hour). For every question the backend
+copies the team's visible runs into a throwaway in-memory SQLite database with runners pseudonymised as `R1…`
+(no names, tokens, routes or streams). The model writes SQL against that copy only; the connection is
+`query_only`, an authorizer allows nothing but reads of the sandbox tables, runtime is capped at 3 s and
+results at 50 rows. Postgres is never queried with model-written SQL. Flow as in SIU: SQL → one retry on error
+→ answer as UI components (optionally one follow-up query); ids are swapped back to names and our own avatar
+URLs server-side.
+
 ---
 
 ## Environment
@@ -176,8 +184,8 @@ Teams are not publicly listed. The authenticated `/teams/mine` endpoint only lis
 | --- | --- |
 | `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | OAuth app credentials |
 | `STRAVA_WEBHOOK_VERIFY_TOKEN` | Webhook subscription handshake |
-| `OPENAI_API_KEY` | Optional: avatar generation and AI coach comments |
-| `OPENAI_TEXT_MODEL` | Coach model, default `gpt-5.4-mini` |
+| `OPENAI_API_KEY` | Optional: avatar generation, AI coach comments and Ask AI |
+| `OPENAI_TEXT_MODEL` | Coach / Ask AI model, default `gpt-5.4-mini` |
 | `TOKEN_ENCRYPTION_KEY` | Encrypts Strava tokens at rest |
 | `SESSION_SECRET` | Signs member session cookies |
 | `DATABASE_URL` | Postgres connection |
@@ -219,11 +227,12 @@ Put the returned `id` into `STRAVA_WEBHOOK_SUBSCRIPTION_ID`.
 | GET | `/api/v1/teams/mine` | session |
 | GET | `/api/v1/teams/{uuid}` | public |
 | PATCH / DELETE | `/api/v1/teams/{uuid}/me` | session + member |
+| POST | `/api/v1/teams/{uuid}/ask` | session + member, 5/h |
 | GET / POST / DELETE | `/api/v1/avatars/me` | session |
 | GET | `/api/v1/teams/{uuid}/avatars/{avatar_uuid}` | visible member only |
 | GET / POST | `/api/v1/strava/webhook` | verify token / subscription id |
 
 ## Status
 
-- Done: landing, imprint, privacy, Strava login, team create/join/overview, avatars (incl. iPhone HEIC), backfill, webhooks, detail/stream sync, live countdown, weekly highlights with true fastest km, recent runs, finish estimates, AI coach roasts.
+- Done: landing, imprint, privacy, Strava login, team create/join/overview, avatars (incl. iPhone HEIC), backfill, webhooks, detail/stream sync, live countdown, rolling 7-day highlights (random selection of stat cards), recent runs, finish estimates, AI coach roasts, Ask AI agent.
 - Next: route map (streams are already stored), team posters, terms page.

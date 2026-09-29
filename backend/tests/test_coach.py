@@ -14,21 +14,17 @@ from app.services.team_stats import TeamView
 
 
 def view() -> TeamView:
-    def member(name: str, week_km: float) -> MemberOut:
+    def member(name: str, km: float) -> MemberOut:
         return MemberOut(
-            name=name, avatar_url=None, avatar_is_generated=False, goal_seconds=None, week_km=week_km,
-            week_runs=1 if week_km else 0, last_4_weeks_km=week_km, prediction_seconds=None,
+            name=name, avatar_url=None, avatar_is_generated=False, goal_seconds=None, km_7d=km,
+            runs_7d=1 if km else 0, last_4_weeks_km=km, prediction_seconds=None,
             best_km_seconds=None, recent_runs=[],
         )
 
-    highlights = HighlightsOut(
-        week_start=datetime(2026, 9, 28).date(), week_km=0, week_time_s=0, week_runs=0, week_elevation_m=0,
-        week_kudos=0, longest_run_km=0, longest_runner=None, fastest_km_seconds=None, fastest_km_runner=None,
-        fastest_pace_seconds_km=None, fastest_runner=None, most_runs=0, most_runs_runner=None,
-    )
+    highlights = HighlightsOut(window_days=7, total_km=0, total_runs=0, cards=[])
     facts = {
-        1: {"km_last_4_weeks": 30, "runs_this_week": 1, "goal_finish_s": None, "predicted_finish_s": None},
-        2: {"km_last_4_weeks": 0, "runs_this_week": 0, "goal_finish_s": None, "predicted_finish_s": None},
+        1: {"km_last_4_weeks": 30, "runs_last_7_days": 1, "goal_finish_s": None, "predicted_finish_s": None},
+        2: {"km_last_4_weeks": 0, "runs_last_7_days": 0, "goal_finish_s": None, "predicted_finish_s": None},
     }
     return TeamView(members=[(1, member("Simon G.", 30)), (2, member("Anna M.", 0))], highlights=highlights, facts=facts)
 
@@ -67,10 +63,10 @@ class CoachTests(unittest.TestCase):
         with patch.object(settings, "openai_api_key", "test"), patch.object(
             coach.httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(respond))
         ):
-            texts = asyncio.run(coach.ask_model({"R1": {"km_this_week": 3}}))
+            texts = asyncio.run(coach.ask_model({"R1": {"km_last_7_days": 3}}))
 
         self.assertEqual(texts, {"R1": "R1 never rests."})
-        self.assertEqual(json.loads(sent[0]["input"]), {"R1": {"km_this_week": 3}})
+        self.assertEqual(json.loads(sent[0]["input"]), {"R1": {"km_last_7_days": 3}})
         self.assertEqual(sent[0]["text"]["format"]["type"], "json_schema")
 
     def test_refresh_gate(self):

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import LoadingState from "@/components/LoadingState"
 import PageTransition from "@/components/PageTransition"
+import AskAI from "@/components/team/AskAI"
 import CoachCard from "@/components/team/CoachCard"
 import JoinTeamCard from "@/components/team/JoinTeamCard"
 import MemberPanel from "@/components/team/MemberPanel"
@@ -101,6 +102,8 @@ export default function TeamPage() {
         ) : (
           <JoinTeamCard teamId={teamId} />
         )}
+
+        {team.viewer && <AskAI teamId={teamId} />}
 
         <p className="text-center text-xs text-muted-foreground">Powered by Strava</p>
       </div>

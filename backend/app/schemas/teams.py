@@ -35,29 +35,27 @@ class MemberOut(BaseModel):
     avatar_url: str | None
     avatar_is_generated: bool
     goal_seconds: int | None
-    week_km: float
-    week_runs: int
+    km_7d: float
+    runs_7d: int
     last_4_weeks_km: float
     prediction_seconds: int | None
     best_km_seconds: int | None
     recent_runs: list[RunOut]
 
 
+class StatCardOut(BaseModel):
+    key: str
+    icon: str
+    label: str
+    value: str
+    detail: str
+
+
 class HighlightsOut(BaseModel):
-    week_start: date
-    week_km: float
-    week_time_s: int
-    week_runs: int
-    week_elevation_m: int
-    week_kudos: int
-    longest_run_km: float
-    longest_runner: str | None
-    fastest_km_seconds: int | None
-    fastest_km_runner: str | None
-    fastest_pace_seconds_km: int | None
-    fastest_runner: str | None
-    most_runs: int
-    most_runs_runner: str | None
+    window_days: int
+    total_km: float
+    total_runs: int
+    cards: list[StatCardOut]
 
 
 class CoachNoteOut(BaseModel):
