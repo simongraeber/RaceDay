@@ -49,10 +49,16 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
     let cancelled = false
     let frame = 0
     let map: any = null
+    let onError: (() => void) | null = null
+    let kit: any = null
 
     loadMapkit()
       .then((mapkit) => {
         if (cancelled || !container.current) return
+        // A token for another domain only fails once MapKit tries to draw
+        kit = mapkit
+        onError = () => setFailed(true)
+        mapkit.addEventListener("error", onError)
         map = new mapkit.Map(container.current, {
           showsCompass: mapkit.FeatureVisibility.Hidden,
           showsZoomControl: true,
@@ -131,6 +137,7 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
     return () => {
       cancelled = true
       cancelAnimationFrame(frame)
+      if (onError) kit?.removeEventListener("error", onError)
       roots.forEach((root) => queueMicrotask(() => root.unmount()))
       map?.destroy()
     }
