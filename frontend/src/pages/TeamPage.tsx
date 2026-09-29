@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { motion } from "framer-motion"
-import { Check, Copy, Eye, EyeOff, LogOut, MapPinned } from "lucide-react"
+import { Check, Copy, Eye, EyeOff, LogOut, MapPinned, WandSparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import AvatarDialog from "@/components/AvatarDialog"
 import { Card, CardContent } from "@/components/ui/card"
 import LoadingState from "@/components/LoadingState"
 import PageTransition from "@/components/PageTransition"
@@ -17,6 +18,7 @@ export default function TeamPage() {
   const [params] = useSearchParams()
   const [team, setTeam] = useState<Team | null | undefined>(undefined)
   const [copied, setCopied] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(params.get("joined") === "1")
 
   const load = useCallback(() => {
     api.getTeam(teamId)
@@ -117,8 +119,23 @@ export default function TeamPage() {
         </div>
 
         {viewer ? (
-          <Card>
-            <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          <>
+            <Card>
+              <CardContent className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  {viewer.avatar_url && <img src={viewer.avatar_url} alt="Your avatar" className="size-12 rounded-full object-cover" />}
+                  <div>
+                    <p className="font-semibold">Your runner</p>
+                    <p className="text-sm text-muted-foreground">{viewer.visible ? "Visible on this team page" : "Hidden from this team page"}</p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setAvatarOpen(true)}>
+                  <WandSparkles /> {viewer.has_avatar ? "Edit avatar" : "Make avatar"}
+                </Button>
+              </CardContent>
+            </Card>
+            <AvatarDialog open={avatarOpen} onOpenChange={setAvatarOpen} hasAvatar={viewer.has_avatar} onChange={load} />
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4">
               <p className="text-sm text-muted-foreground">
                 {viewer.visible ? "You're visible on this team page." : "You're hidden from this team page."}
               </p>
@@ -132,8 +149,8 @@ export default function TeamPage() {
                   Leave
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </>
         ) : (
           <Card className="relative overflow-hidden">
             <div className="absolute -right-10 -top-10 size-40 rounded-full bg-gradient-to-br from-[var(--glow-from)] to-[var(--glow-to)] blur-[40px]" />

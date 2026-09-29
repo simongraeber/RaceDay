@@ -24,6 +24,14 @@ export interface Me {
   teams: string[]
 }
 
+export interface MyTeam {
+  id: string
+  name: string
+  race_name: string
+  race_date: string
+  race_distance_m: number
+}
+
 export interface Member {
   name: string
   avatar_url: string | null
@@ -37,6 +45,8 @@ export interface Member {
 export interface Viewer {
   visible: boolean
   goal_seconds: number | null
+  avatar_url: string | null
+  has_avatar: boolean
 }
 
 export interface Team {
@@ -57,8 +67,18 @@ export interface TeamCreate {
 
 export const api = {
   me: () => request<Me>("/auth/me"),
+  myTeams: () => request<MyTeam[]>("/teams/mine"),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
   deleteAccount: () => request<void>("/auth/me", { method: "DELETE" }),
+  generateAvatar: async (photo: File, description: string) => {
+    const body = new FormData()
+    body.append("photo", photo)
+    body.append("description", description)
+    const res = await fetch(`${BASE}/avatars/me`, { method: "POST", body })
+    if (!res.ok) throw new ApiError(res.status, await res.text())
+    return res.json() as Promise<{ url: string }>
+  },
+  deleteAvatar: () => request<void>("/avatars/me", { method: "DELETE" }),
   getTeam: (id: string) => request<Team>(`/teams/${encodeURIComponent(id)}`),
   createTeam: (body: TeamCreate) =>
     request<{ id: string }>("/teams", { method: "POST", body: JSON.stringify(body) }),

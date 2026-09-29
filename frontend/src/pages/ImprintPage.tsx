@@ -14,9 +14,9 @@ export default function ImprintPage() {
 
       <motion.div variants={staggerContainer} initial="hidden" animate="show">
         <motion.div variants={popIn}>
-          <Card className="relative mb-8">
+          <Card className="relative mx-auto mb-8 max-w-xl">
             <div className="absolute left-0 top-0 size-40 rounded-full bg-gradient-to-br from-[var(--glow-from)] to-[var(--glow-to)] blur-[40px]" />
-            <CardContent className="relative z-10 flex flex-col items-center gap-6 p-8 md:flex-row">
+            <CardContent className="relative z-10 flex flex-col items-center gap-6 p-8 md:flex-row md:gap-4 md:px-6">
               <div className="flex shrink-0 flex-col items-center justify-center">
                 <img src="/logo.svg" alt="RaceDay" className="mb-2 size-24 rounded-xl" />
                 <div className="relative w-44 -rotate-6 pl-2 md:scale-[1.1]">

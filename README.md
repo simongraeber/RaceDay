@@ -2,7 +2,7 @@
 
 A shared, map-based countdown for a running team. Connect Strava, see where everyone ran, who put in the work, and what the AI thinks each member will run on race day.
 
-Built for one concrete goal: **Half marathon, 04.04.2026.**
+Check it out at [RaceDay](https://raceday.simongraeber.com)
 
 ---
 
@@ -139,7 +139,7 @@ This keeps predictions defensible and cheap, and keeps the LLM doing what it's g
 | Charts | Recharts |
 | Backend | Python 3.12, FastAPI, async SQLAlchemy |
 | Database | PostgreSQL |
-| Integrations | Strava OAuth2 + webhooks, Gemini API (text + images) |
+| Integrations | Strava OAuth2 + webhooks, OpenAI image edits (avatars); Gemini planned for recaps |
 | Deployment | Docker Compose, nginx, GitHub Actions |
 
 Mirrors the stack and conventions of the SIU project.
@@ -152,13 +152,14 @@ Mirrors the stack and conventions of the SIU project.
 Team (uuid, name, race_name, race_date, race_distance_m, created_by)
   └── Membership (team_id, athlete_id, visible, goal_seconds)
 Athlete (strava_id, name, avatar, scope, refresh_token_enc, access_token_enc, expires_at)
+  └── Avatar (athlete_id, uuid, generated_image)  -- optional, original photo discarded
   └── Activity (athlete_id, strava_id, start_date, distance, moving_time,
                 elevation, summary_polyline)  -- start/end trimmed
 Prediction (athlete_id, team_id, predicted_seconds, confidence, computed_at)
 Recap (team_id, week, payload_json, image_url)
 ```
 
-The team UUID is the only handle that exists. IDs are never enumerated in any API response.
+Teams are not publicly listed. The authenticated `/teams/mine` endpoint only lists the caller's teams.
 
 ---
 
@@ -168,7 +169,7 @@ The team UUID is the only handle that exists. IDs are never enumerated in any AP
 | --- | --- |
 | `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | OAuth app credentials |
 | `STRAVA_WEBHOOK_VERIFY_TOKEN` | Webhook subscription handshake |
-| `GEMINI_API_KEY` | Recaps, prediction narrative, images |
+| `OPENAI_API_KEY` | Optional photo-to-cartoon avatar generation |
 | `TOKEN_ENCRYPTION_KEY` | Encrypts Strava tokens at rest |
 | `SESSION_SECRET` | Signs member session cookies |
 | `DATABASE_URL` | Postgres connection |
@@ -207,11 +208,14 @@ Put the returned `id` into `STRAVA_WEBHOOK_SUBSCRIPTION_ID`.
 | GET / DELETE | `/api/v1/auth/me` | session |
 | POST | `/api/v1/auth/logout` | session |
 | POST | `/api/v1/teams` | session |
+| GET | `/api/v1/teams/mine` | session |
 | GET | `/api/v1/teams/{uuid}` | public |
 | PATCH / DELETE | `/api/v1/teams/{uuid}/me` | session + member |
+| GET / POST / DELETE | `/api/v1/avatars/me` | session |
+| GET | `/api/v1/teams/{uuid}/avatars/{avatar_uuid}` | visible member only |
 | GET / POST | `/api/v1/strava/webhook` | verify token / subscription id |
 
 ## Status
 
-- Done: landing, imprint, privacy, Strava login, team create/join, backfill, webhooks, placeholder team page.
-- Next: map, predictions, AI recaps, generated images, terms page.
+- Done: landing, imprint, privacy, Strava login, team create/join/overview, avatar generation, backfill, webhooks, placeholder team page.
+- Next: map, predictions, AI recaps, team posters, terms page.

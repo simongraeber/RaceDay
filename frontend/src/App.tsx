@@ -7,6 +7,7 @@ import HomePage from "@/pages/HomePage"
 const ImprintPage = lazy(() => import("@/pages/ImprintPage"))
 const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"))
 const NewTeamPage = lazy(() => import("@/pages/NewTeamPage"))
+const TeamsPage = lazy(() => import("@/pages/TeamsPage"))
 const TeamPage = lazy(() => import("@/pages/TeamPage"))
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"))
 
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="/imprint" element={<ImprintPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/new" element={<NewTeamPage />} />
+              <Route path="/teams" element={<TeamsPage />} />
               <Route path="/t/:teamId" element={<TeamPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

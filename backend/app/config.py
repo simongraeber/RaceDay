@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     strava_webhook_verify_token: str = ""
     strava_webhook_subscription_id: int | None = None
 
+    openai_api_key: str = ""
+
     # Fernet key for Strava tokens at rest
     token_encryption_key: str
     session_secret: str
