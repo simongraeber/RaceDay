@@ -1,0 +1,48 @@
+name: raceday
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: raceday-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: raceday
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: raceday
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raceday"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: raceday-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://raceday:${POSTGRES_PASSWORD}@postgres:5432/raceday
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:-}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:-}
+      STRAVA_WEBHOOK_VERIFY_TOKEN: ${STRAVA_WEBHOOK_VERIFY_TOKEN:-}
+      STRAVA_WEBHOOK_SUBSCRIPTION_ID: ${STRAVA_WEBHOOK_SUBSCRIPTION_ID:-}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?set TOKEN_ENCRYPTION_KEY in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      APP_BASE_URL: https://raceday.simongraeber.com
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: raceday-frontend
+    restart: unless-stopped
+    # Only reachable via the host nginx
+    ports:
+      - "127.0.0.1:18200:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

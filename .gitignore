@@ -1,0 +1,25 @@
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Python
+backend/.venv/
+backend/venv/
+__pycache__/
+*.pyc
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Private deployment notes (server details)
+PrivateDeploymentReadme.md
+
+*.log
