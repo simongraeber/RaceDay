@@ -61,13 +61,14 @@ class AvatarTests(unittest.TestCase):
         with patch.object(settings, "openai_api_key", "test-key"), patch.object(avatar.httpx, "AsyncClient", client):
             result = asyncio.run(avatar.generate_avatar(avatar.normalize_image(image_bytes()), "blue headband"))
 
-        self.assertTrue(result.startswith(b"\xff\xd8"))
+        self.assertTrue(result.startswith(b"\x89PNG"))
         body = requests[0].content
         self.assertEqual(body.count(b'name="image[]"'), 2)
         self.assertIn(b"runner.png", body)
         self.assertIn(b"style.png", body)
         self.assertIn(b"blue headband", body)
         self.assertIn(b"gpt-image-2.5-flare", body)
+        self.assertIn(b"transparent", body)
 
 
 if __name__ == "__main__":

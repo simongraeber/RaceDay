@@ -77,7 +77,8 @@ async def own_avatar(athlete: Athlete = Depends(get_current_athlete), db: AsyncS
     avatar = await db.get(Avatar, athlete.id)
     if not avatar or avatar.image is None:
         raise HTTPException(status_code=404, detail="No avatar")
-    return Response(avatar.image, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    media_type = "image/png" if avatar.image.startswith(b"\x89PNG") else "image/jpeg"
+    return Response(avatar.image, media_type=media_type, headers={"Cache-Control": "no-store"})
 
 
 @router.delete("/avatars/me", status_code=204)
@@ -103,4 +104,5 @@ async def team_avatar(team_id: uuid.UUID, avatar_id: uuid.UUID, db: AsyncSession
     )
     if image is None:
         raise HTTPException(status_code=404, detail="Avatar not found")
-    return Response(image, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    media_type = "image/png" if image.startswith(b"\x89PNG") else "image/jpeg"
+    return Response(image, media_type=media_type, headers={"Cache-Control": "no-store"})

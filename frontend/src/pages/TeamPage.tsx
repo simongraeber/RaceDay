@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from "react"
+import { Link } from "react-router-dom"
 import { useParams, useSearchParams } from "react-router-dom"
-import { motion } from "framer-motion"
-import { Check, Copy, Eye, EyeOff, LogOut, MapPinned, WandSparkles } from "lucide-react"
+import { ArrowLeft, Check, Copy, Eye, EyeOff, LogOut, MapPinned, WandSparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import AvatarDialog from "@/components/AvatarDialog"
 import { Card, CardContent } from "@/components/ui/card"
 import LoadingState from "@/components/LoadingState"
 import PageTransition from "@/components/PageTransition"
+import RaceCountdown from "@/components/RaceCountdown"
+import RunnerCard from "@/components/RunnerCard"
 import StravaConnectButton from "@/components/StravaConnectButton"
+import WeeklyHighlights from "@/components/WeeklyHighlights"
 import NotFoundPage from "@/pages/NotFoundPage"
 import { api, ApiError, stravaLoginUrl, type Team } from "@/lib/api"
-import { fadeUp, staggerContainer } from "@/lib/animations"
-import { daysUntil, formatDate, formatDuration } from "@/lib/utils"
 
 export default function TeamPage() {
   const { teamId = "" } = useParams()
@@ -31,7 +32,6 @@ export default function TeamPage() {
   if (team === null) return <NotFoundPage />
   if (team === undefined) return <LoadingState />
 
-  const days = daysUntil(team.race_date)
   const viewer = team.viewer
 
   async function copyLink() {
@@ -54,21 +54,20 @@ export default function TeamPage() {
 
   return (
     <PageTransition>
-      <section className="hero">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">{team.race_name}</p>
-        <h1 className="gradient-text mb-4 text-4xl font-extrabold tracking-tight md:text-5xl">{team.name}</h1>
-        <p className="text-6xl font-black tabular-nums md:text-7xl">{Math.max(days, 0)}</p>
-        <p className="mb-6 text-muted-foreground">
-          {days > 0 ? "days to go" : days === 0 ? "It's race day!" : "Race day is over"} · {formatDate(team.race_date)} ·{" "}
-          {(team.race_distance_m / 1000).toFixed(1)} km
-        </p>
+      <header className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-5">
+        <div className="min-w-0">
+          {viewer && <Link to="/teams" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"><ArrowLeft className="size-3.5" /> My teams</Link>}
+          <h1 className="break-words text-2xl font-bold text-foreground">{team.name}</h1>
+          <p className="text-xs text-muted-foreground">{(team.race_distance_m / 1000).toFixed(1)} km · {team.members.length} runners</p>
+        </div>
         <Button variant="outline" size="sm" onClick={copyLink}>
           {copied ? <Check /> : <Copy />}
           {copied ? "Copied" : "Copy team link"}
         </Button>
-      </section>
+      </header>
+      <RaceCountdown date={team.race_date} race={team.race_name} />
 
-      <div className="mx-auto max-w-4xl space-y-8 px-4 py-10">
+      <div className="mx-auto max-w-5xl space-y-12 px-5 py-10">
         {params.get("joined") && (
           <Card className="border-primary/40 bg-secondary">
             <CardContent className="text-sm text-secondary-foreground">
@@ -77,46 +76,33 @@ export default function TeamPage() {
           </Card>
         )}
 
-        <Card className="flex h-64 items-center justify-center border-dashed">
-          <div className="text-center text-muted-foreground">
-            <MapPinned className="mx-auto mb-2 size-10" />
-            <p>The team map is coming soon.</p>
-          </div>
-        </Card>
+        <WeeklyHighlights highlights={team.highlights} teamName={team.name} />
 
-        <div>
-          <h2 className="mb-4 text-2xl font-bold">Team ({team.members.length})</h2>
+        <section aria-labelledby="runners-heading">
+          <div className="mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p className="mb-1 text-xs font-bold uppercase text-primary">Meet the crew</p>
+              <h2 id="runners-heading" className="text-2xl font-bold">On the start line</h2>
+            </div>
+            <span className="text-xs text-muted-foreground">Training estimates, not guarantees</span>
+          </div>
           {team.members.length === 0 ? (
-            <p className="text-muted-foreground">No one here yet.</p>
+            <p className="border-y border-border py-10 text-center text-muted-foreground">No one here yet. Share the team link to get started.</p>
           ) : (
-            <motion.div className="grid gap-4 sm:grid-cols-2" variants={staggerContainer} initial="hidden" animate="show">
+            <div className="grid gap-4 sm:grid-cols-2">
               {team.members.map((m, i) => (
-                <motion.div key={i} variants={fadeUp}>
-                  <Card>
-                    <CardContent className="flex items-center gap-4">
-                      {m.avatar_url ? (
-                        <img src={m.avatar_url} alt="" className="size-12 rounded-full object-cover" />
-                      ) : (
-                        <div className="flex size-12 items-center justify-center rounded-full bg-secondary font-bold text-secondary-foreground">
-                          {m.name[0]}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">{m.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {m.total_km} km · {m.runs} runs · {m.last_4_weeks_km} km last 4 weeks
-                        </p>
-                        {m.goal_seconds && (
-                          <p className="text-xs text-muted-foreground">Goal: {formatDuration(m.goal_seconds)}</p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                <RunnerCard key={`${m.name}-${i}`} member={m} index={i} />
               ))}
-            </motion.div>
+            </div>
           )}
-        </div>
+        </section>
+
+        <section aria-labelledby="training-map-heading" className="border-t border-border pt-6">
+          <h2 id="training-map-heading" className="mb-4 text-lg font-semibold">Training map</h2>
+          <div className="flex h-44 items-center justify-center gap-3 border border-dashed border-border text-sm text-muted-foreground">
+            <MapPinned className="size-5" /> Routes coming soon
+          </div>
+        </section>
 
         {viewer ? (
           <>

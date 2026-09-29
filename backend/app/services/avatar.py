@@ -39,10 +39,10 @@ def normalize_image(raw: bytes) -> bytes:
 def to_avatar(raw: bytes) -> bytes:
     try:
         with Image.open(BytesIO(raw)) as image:
-            image = image.convert("RGB")
+            image = image.convert("RGBA")
             image.thumbnail((768, 768))
             output = BytesIO()
-            image.save(output, format="JPEG", quality=85, optimize=True)
+            image.save(output, format="PNG", optimize=True)
             return output.getvalue()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise GenerationFailed("Image generation returned an invalid image") from exc
@@ -54,6 +54,7 @@ async def generate_avatar(photo: bytes, description: str) -> bytes:
         "Preserve their recognizable facial features, hair and skin tone; render them in running clothes. "
         "Use the SECOND image only as the visual style reference: match its character proportions, "
         "material, lighting and level of detail. Center the character against a clean neutral background. "
+        "Full upper-body character, no rectangular backdrop; transparent background. "
         "No text, logos or other people. "
         f"Optional runner details: {description.strip()[:300]}"
     )
@@ -67,7 +68,8 @@ async def generate_avatar(photo: bytes, description: str) -> bytes:
                     "prompt": prompt,
                     "size": "1024x1024",
                     "quality": "medium",
-                    "output_format": "jpeg",
+                    "output_format": "png",
+                    "background": "transparent",
                 },
                 files=[
                     ("image[]", ("runner.png", photo, "image/png")),
