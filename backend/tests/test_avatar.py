@@ -1,8 +1,10 @@
 import asyncio
 import base64
 import unittest
+import uuid
 from io import BytesIO
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi import HTTPException
@@ -10,8 +12,12 @@ from PIL import Image
 from starlette.requests import Request
 
 from app.api.v1.avatars import require_site_origin
+from app.api.v1 import teams
 from app.config import settings
+from app.schemas.teams import HighlightsOut, MemberOut, StatCardOut
 from app.services import avatar
+from app.services import card_art
+from app.services.team_stats import TeamView
 
 
 def image_bytes(format: str = "PNG") -> bytes:
@@ -29,6 +35,72 @@ def transparent_avatar() -> bytes:
 
 
 class AvatarTests(unittest.TestCase):
+    def test_team_card_art_endpoint_serves_a_current_subject_image(self):
+        team_id = uuid.uuid4()
+        image_id = uuid.uuid4()
+        image = b"\x89PNG image bytes"
+        database = SimpleNamespace(scalar=AsyncMock(return_value=image))
+        url = f"/api/v1/teams/{team_id}/group-art/{image_id}"
+
+        with patch.object(teams, "_get_team", AsyncMock(return_value=object())), patch.object(
+            teams, "load_team_view", AsyncMock(return_value=object())
+        ), patch.object(teams.card_art, "team_card_subjects", return_value={"pace": 1}), patch.object(
+            teams.card_art, "group_art_status", AsyncMock(return_value=({"pace": url}, "signature", {"pace": True}))
+        ):
+            response = asyncio.run(teams.group_art_image(team_id, image_id, database))
+
+        self.assertEqual(response.body, image)
+        self.assertEqual(response.media_type, "image/png")
+
+    def test_team_reference_composites_every_runner(self):
+        composite = card_art.compose_team_reference([transparent_avatar(), transparent_avatar(), transparent_avatar()])
+        with Image.open(BytesIO(composite)) as result:
+            self.assertEqual(result.mode, "RGBA")
+            self.assertEqual(result.size, (1024, 768))
+            self.assertGreater(sum(result.getchannel("A").histogram()[1:]), 0)
+        self.assertNotEqual(
+            card_art.group_member_signature([(1, None), (2, None)]),
+            card_art.group_member_signature([(1, None), (2, None), (3, None)]),
+        )
+        self.assertNotEqual(card_art.group_art_prompt("climbed", 3), card_art.group_art_prompt("prs", 3))
+        signature = card_art.group_member_signature([(1, None), (2, None)])
+        self.assertNotEqual(
+            card_art._request_signature(signature, {"pace": 1}),
+            card_art._request_signature(signature, {"pace": 2}),
+        )
+
+    def test_team_and_solo_cards_select_the_right_art_subject(self):
+        def member(name: str) -> MemberOut:
+            return MemberOut(
+                name=name,
+                avatar_url=None,
+                avatar_is_generated=True,
+                goal_seconds=None,
+                km_7d=1,
+                runs_7d=1,
+                last_4_weeks_km=1,
+                prediction_seconds=None,
+                best_km_seconds=None,
+                recent_runs=[],
+            )
+
+        cards = [
+            StatCardOut(key="time", icon="clock", label="Time on feet", value="1:10", detail="All runners combined"),
+            StatCardOut(key="climbed", icon="mountain", label="Climbed together", value="200 m", detail="0.6x"),
+            StatCardOut(key="prs", icon="medal", label="Personal records", value="2", detail="Set on Strava"),
+            StatCardOut(key="pace", icon="gauge", label="Quickest run pace", value="4:30 /km", detail="Joni"),
+            StatCardOut(key="kudos", icon="heart", label="Kudos collected", value="5", detail="Most loved: Anna"),
+        ]
+        view = TeamView(
+            members=[(1, member("Joni")), (2, member("Anna"))],
+            highlights=HighlightsOut(window_days=7, total_km=10, total_runs=2, cards=cards),
+            facts={},
+        )
+        self.assertEqual(
+            card_art.team_card_subjects(view),
+            {"together": None, "time": None, "climbed": None, "prs": None, "pace": 1, "kudos": 2},
+        )
+
     def test_avatar_writes_require_site_origin(self):
         def request(origin: str) -> Request:
             return Request({

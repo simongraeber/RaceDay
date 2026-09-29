@@ -19,7 +19,7 @@ from app.security import (
     create_session_token,
     read_oauth_state,
 )
-from app.services import strava, sync, team_cache
+from app.services import coach, strava, sync, team_cache
 
 log = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ async def strava_callback(
 
     team_id = payload.get("team")
     back = f"/t/{team_id}" if team_id else "/"
+    joined_team = None
     if error or not code:
         return _redirect(f"{back}?error=access_denied")
     if "activity:read_all" not in scope.split(","):
@@ -109,6 +110,7 @@ async def strava_callback(
         else:
             if await db.get(Membership, (team.id, athlete.id)) is None:
                 db.add(Membership(team_id=team.id, athlete_id=athlete.id))
+                joined_team = team.id
                 target = f"/t/{team.id}?joined=1"
             else:
                 target = f"/t/{team.id}"
@@ -118,6 +120,8 @@ async def strava_callback(
     # A scope upgrade makes previously invisible runs readable, so re-import the history
     if athlete.last_synced_at is None or scope_upgraded:
         background.add_task(sync.backfill, athlete.id)
+    if joined_team is not None and settings.openai_api_key:
+        background.add_task(coach.refresh, joined_team)
 
     resp = _redirect(target)
     resp.set_cookie(

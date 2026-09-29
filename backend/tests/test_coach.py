@@ -48,6 +48,17 @@ class CoachTests(unittest.TestCase):
         self.assertEqual(out.notes[0].text, "Simon G. thinks they are the Flash.")
         self.assertEqual(len(out.notes), 2)
 
+    def test_new_member_without_an_ai_note_gets_fallback(self):
+        note = TeamCoachNote(
+            generated_at=datetime.now(timezone.utc),
+            notes=[{"athlete_id": 1, "text": "Simon is still running."}],
+        )
+        with patch.object(settings, "openai_api_key", "test"):
+            self.assertTrue(coach.should_refresh(object(), view(), note))
+        out = coach.coach_view(view(), note)
+        self.assertEqual(out.source, "coach")
+        self.assertEqual([item.name for item in out.notes], ["Simon G.", "Anna M."])
+
     def test_model_request_is_pseudonymous_and_parsed(self):
         sent = []
 
@@ -67,6 +78,8 @@ class CoachTests(unittest.TestCase):
 
         self.assertEqual(texts, {"R1": "R1 never rests."})
         self.assertEqual(json.loads(sent[0]["input"]), {"R1": {"km_last_7_days": 3}})
+        self.assertIn("vary the focus across runners and refreshes", sent[0]["instructions"])
+        self.assertIn("average weekly pace", sent[0]["instructions"])
         self.assertEqual(sent[0]["text"]["format"]["type"], "json_schema")
 
     def test_refresh_gate(self):

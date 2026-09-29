@@ -57,6 +57,7 @@ class HighlightsOut(BaseModel):
     total_km: float
     total_runs: int
     cards: list[StatCardOut]
+    together_image_url: str | None = None
 
 
 class CoachNoteOut(BaseModel):

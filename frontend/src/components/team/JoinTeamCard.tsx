@@ -11,8 +11,8 @@ export default function JoinTeamCard({ teamId }: { teamId: string }) {
         <p className="mx-auto max-w-md text-sm text-muted-foreground">
           Joining shares your first name, last initial, profile picture, and your runs from the last
           12 months — including private and followers-only ones — with anyone who has this link. Routes
-          are stored only for runs you share with everyone, with start and end cut off. You can hide
-          yourself or leave any time.
+          are shown for runs shared with followers or everyone on Strava, with start and end cut off.
+          Runs set to Only You have no route shown. You can hide yourself or leave any time.
         </p>
         <StravaConnectButton href={stravaLoginUrl("join", teamId)} />
       </CardContent>

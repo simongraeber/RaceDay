@@ -59,6 +59,7 @@ export interface Highlights {
   total_km: number
   total_runs: number
   cards: StatCard[]
+  together_image_url: string | null
 }
 
 type Images = { image_urls?: string[] }
