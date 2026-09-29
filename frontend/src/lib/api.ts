@@ -51,6 +51,7 @@ export interface StatCard {
   label: string
   value: string
   detail: string
+  image_url: string | null
 }
 
 export interface Highlights {

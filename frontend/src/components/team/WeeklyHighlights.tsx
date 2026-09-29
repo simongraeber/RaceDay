@@ -24,7 +24,7 @@ const ICONS: Record<string, LucideIcon> = {
   flag: Flag,
   ghost: Ghost,
 }
-const SHOWN = 6
+const SHOWN = 8
 
 function shuffled<T>(items: T[]): T[] {
   const copy = [...items]
@@ -37,8 +37,11 @@ function shuffled<T>(items: T[]): T[] {
 
 export default function WeeklyHighlights({ highlights, teamName }: { highlights: Highlights; teamName: string }) {
   const reduceMotion = useReducedMotion()
-  // A fresh random pick of categories and colours on every visit
-  const [cards] = useState(() => shuffled(highlights.cards).slice(0, SHOWN))
+  // A fresh random pick of categories and colours on every visit, artwork cards never miss out
+  const [cards] = useState(() => {
+    const pool = shuffled(highlights.cards)
+    return shuffled([...pool.filter((c) => c.image_url), ...pool.filter((c) => !c.image_url)].slice(0, SHOWN))
+  })
   const [offset] = useState(() => Math.floor(Math.random() * 4))
   const items = [
     {
@@ -47,6 +50,7 @@ export default function WeeklyHighlights({ highlights, teamName }: { highlights:
       label: `Together, last ${highlights.window_days} days`,
       value: `${highlights.total_km.toFixed(1)} km`,
       detail: `${highlights.total_runs} runs logged`,
+      image_url: null,
     },
     ...cards.map((c) => ({ ...c, icon: ICONS[c.icon] ?? Activity })),
   ]
@@ -64,20 +68,21 @@ export default function WeeklyHighlights({ highlights, teamName }: { highlights:
           <p className="mb-1 text-xs font-bold uppercase text-primary">The weekly pulse</p>
           <h2 id="weekly-heading" className="text-2xl font-bold">This week, together</h2>
         </div>
-        <span className="text-xs text-muted-foreground">Last {highlights.window_days} days</span>
+        <span className="text-xs text-muted-foreground">Last {highlights.window_days} days · swipe for more</span>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {items.map(({ key, label, value, detail, icon: Icon }, index) => (
+      <div className="week-row">
+        {items.map(({ key, label, value, detail, icon: Icon, image_url }, index) => (
           <motion.div
             key={key}
-            className={`week-tile week-tile--${(offset + index) % 4} ${index === 0 ? "col-span-2" : ""}`}
+            className={`week-tile week-tile--${(offset + index) % 4}`}
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.05, duration: 0.4 }}
           >
-            <Icon className="size-5 opacity-65" aria-hidden="true" />
-            <div className="mt-auto min-w-0">
+            {image_url && <img src={image_url} alt="" loading="lazy" className="week-tile-art" />}
+            <Icon className="relative size-5 opacity-65" aria-hidden="true" />
+            <div className="relative mt-auto min-w-0">
               <p className="text-xs font-medium opacity-75">{label}</p>
               <p className="mt-1 text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
               <p className="mt-1 truncate text-xs opacity-75" title={detail}>{detail}</p>

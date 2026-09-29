@@ -49,6 +49,7 @@ class StatCardOut(BaseModel):
     label: str
     value: str
     detail: str
+    image_url: str | None = None
 
 
 class HighlightsOut(BaseModel):
