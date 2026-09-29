@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, MapPin, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import PageTransition from "@/components/PageTransition"
+import GreetingsAnimation from "@/components/GreetingsAnimation"
 import { fadeUp, popIn, staggerContainer } from "@/lib/animations"
 
 export default function ImprintPage() {
@@ -13,10 +14,15 @@ export default function ImprintPage() {
 
       <motion.div variants={staggerContainer} initial="hidden" animate="show">
         <motion.div variants={popIn}>
-          <Card className="relative mb-8 overflow-hidden">
+          <Card className="relative mb-8">
             <div className="absolute left-0 top-0 size-40 rounded-full bg-gradient-to-br from-[var(--glow-from)] to-[var(--glow-to)] blur-[40px]" />
             <CardContent className="relative z-10 flex flex-col items-center gap-6 p-8 md:flex-row">
-              <img src="/logo.svg" alt="RaceDay" className="size-24 shrink-0 rounded-xl" />
+              <div className="flex shrink-0 flex-col items-center justify-center">
+                <img src="/logo.svg" alt="RaceDay" className="mb-2 size-24 rounded-xl" />
+                <div className="relative w-44 -rotate-6 pl-2 md:scale-[1.1]">
+                  <GreetingsAnimation />
+                </div>
+              </div>
               <div className="flex min-w-0 flex-col gap-4 text-left">
                 <div className="flex items-center gap-2">
                   <User className="size-5 text-primary" />
