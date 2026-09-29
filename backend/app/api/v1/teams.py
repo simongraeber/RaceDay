@@ -8,7 +8,7 @@ from app.api.deps import get_current_athlete, get_optional_athlete
 from app.database import get_db
 from app.models import Athlete, Avatar, CardImage, Membership, Team, TeamCoachNote
 from app.schemas.teams import MembershipUpdate, MyTeamOut, TeamCreate, TeamCreated, TeamOut, ViewerOut
-from app.services import card_art, coach, team_cache
+from app.services import card_art, coach, rig, team_cache
 from app.services.team_stats import load_team_view
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -85,6 +85,8 @@ async def get_team(
         background.add_task(coach.refresh, team.id)
     if card_art.should_refresh(team.id, view):
         background.add_task(card_art.refresh, team.id)
+    if rig.should_backfill(team.id):
+        background.add_task(rig.backfill, team.id)
 
     viewer_out = None
     if viewer is not None:
