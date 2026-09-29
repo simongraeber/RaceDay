@@ -87,6 +87,7 @@ export interface Viewer {
   goal_seconds: number | null
   avatar_url: string | null
   has_avatar: boolean
+  needs_reconnect: boolean
 }
 
 export interface Team {

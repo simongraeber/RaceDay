@@ -9,9 +9,10 @@ export default function JoinTeamCard({ teamId }: { teamId: string }) {
       <CardContent className="relative space-y-4 text-center">
         <h2 className="text-xl font-bold">Running this race too?</h2>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">
-          Joining shares your first name, last initial, profile picture, and your public runs
-          from the last 12 months with anyone who has this link. Start and end of every route
-          are cut off. You can hide yourself or leave any time.
+          Joining shares your first name, last initial, profile picture, and your runs from the last
+          12 months — including private and followers-only ones — with anyone who has this link. Routes
+          are stored only for runs you share with everyone, with start and end cut off. You can hide
+          yourself or leave any time.
         </p>
         <StravaConnectButton href={stravaLoginUrl("join", teamId)} />
       </CardContent>

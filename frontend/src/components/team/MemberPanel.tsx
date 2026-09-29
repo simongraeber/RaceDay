@@ -1,9 +1,9 @@
 import { useState } from "react"
-import { Eye, EyeOff, LogOut, WandSparkles } from "lucide-react"
+import { Eye, EyeOff, LogOut, RefreshCw, WandSparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import AvatarDialog from "@/components/team/AvatarDialog"
-import { api, type Viewer } from "@/lib/api"
+import { api, stravaLoginUrl, type Viewer } from "@/lib/api"
 
 interface Props {
   teamId: string
@@ -28,6 +28,18 @@ export default function MemberPanel({ teamId, viewer, openAvatar, onChange }: Pr
 
   return (
     <section aria-label="Your membership" className="space-y-4">
+      {viewer.needs_reconnect && (
+        <Card className="border-primary/40 bg-secondary">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-secondary-foreground">
+              Runs you keep private or share only with followers are missing. Reconnect Strava to count them too.
+            </p>
+            <Button size="sm" asChild>
+              <a href={stravaLoginUrl("join", teamId)}><RefreshCw /> Reconnect Strava</a>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">

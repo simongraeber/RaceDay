@@ -16,7 +16,12 @@ log = logging.getLogger(__name__)
 
 RUN_TYPES = {"Run", "TrailRun", "VirtualRun"}
 BACKFILL_DAYS = 365
-TRIM_METERS = 200
+TRIM_METERS = 400
+
+
+def is_public(data: dict) -> bool:
+    """True only for runs the athlete shares with everyone on Strava."""
+    return not data.get("private") and data.get("visibility", "everyone") == "everyone"
 
 
 def _haversine(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -41,11 +46,10 @@ def trim_polyline(encoded: str | None, meters: float = TRIM_METERS) -> str | Non
 
 
 async def upsert_activity(db: AsyncSession, athlete_id: int, activity_id: int, data: dict | None) -> None:
-    """Store a public run, or remove it if it's gone, private, or not a run."""
+    """Store a run of the athlete, or remove it if it's gone or not a run."""
     if (
         data is None
         or data.get("sport_type") not in RUN_TYPES
-        or data.get("private")
         or data.get("athlete", {}).get("id") != athlete_id
     ):
         await db.execute(
@@ -63,7 +67,7 @@ async def upsert_activity(db: AsyncSession, athlete_id: int, activity_id: int, d
         "moving_time_s": data.get("moving_time") or 0,
         "elapsed_time_s": data.get("elapsed_time") or 0,
         "elevation_gain_m": data.get("total_elevation_gain") or 0,
-        "summary_polyline": trim_polyline((data.get("map") or {}).get("summary_polyline")),
+        "summary_polyline": trim_polyline((data.get("map") or {}).get("summary_polyline")) if is_public(data) else None,
     }
     stmt = insert(Activity).values(**values)
     await db.execute(

@@ -74,6 +74,7 @@ class ViewerOut(BaseModel):
     goal_seconds: int | None
     avatar_url: str | None
     has_avatar: bool
+    needs_reconnect: bool
 
 
 class TeamOut(BaseModel):

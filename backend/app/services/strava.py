@@ -13,8 +13,9 @@ TOKEN_URL = "https://www.strava.com/oauth/token"
 REVOKE_URL = "https://www.strava.com/oauth/revoke"
 API_URL = "https://www.strava.com/api/v3"
 
-# activity:read (not read_all) excludes "Only Me" activities and privacy-zone data
-SCOPE = "read,activity:read"
+# read_all also covers "Only You" and followers-only runs; Strava then stops masking privacy zones,
+# so routes are trimmed harder on our side and kept only for runs visible to everyone.
+SCOPE = "read,activity:read_all"
 PER_PAGE = 200
 STREAM_KEYS = "latlng,altitude,distance,time"
 _TIMEOUT = 15.0
