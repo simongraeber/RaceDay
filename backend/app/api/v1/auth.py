@@ -91,7 +91,7 @@ async def strava_callback(
     athlete.lastname = profile.get("lastname") or ""
     avatar = profile.get("profile_medium") or ""
     athlete.avatar_url = avatar if avatar.startswith("https://") else None
-    scope_upgraded = "activity:read_all" not in athlete.scope.split(",")
+    scope_upgraded = "activity:read_all" not in (athlete.scope or "").split(",")
     athlete.scope = scope
     strava.store_tokens(athlete, tokens)
 
