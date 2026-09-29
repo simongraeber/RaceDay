@@ -2,6 +2,7 @@
 
 import base64
 import logging
+import time
 import uuid
 from io import BytesIO
 
@@ -11,7 +12,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.database import async_session
-from app.models import Avatar, AvatarRig
+from app.models import Avatar, AvatarRig, Membership
 from app.services import team_cache
 from app.services.avatar import REFERENCE_IMAGE, GenerationFailed
 
@@ -20,6 +21,11 @@ log = logging.getLogger(__name__)
 TEMPLATE = REFERENCE_IMAGE.parent / "ReferenceDecomposed.png"
 # The frontend rig slices the sheet by fixed pixel boxes, so the size is part of the contract
 SHEET_SIZE = (682, 1024)
+BACKFILL_PER_RUN = 3
+RETRY_AFTER_S = 10 * 60
+
+_running: set[uuid.UUID] = set()
+_last_attempt: dict[uuid.UUID, float] = {}
 
 PROMPT = (
     "The FIRST image is a character sheet: one cartoon runner already cut into separate body parts "
@@ -96,3 +102,37 @@ async def refresh(athlete_id: int) -> None:
             team_cache.clear()
     except (httpx.HTTPError, GenerationFailed, ValueError, KeyError):
         log.warning("Character sheet for athlete %s failed", athlete_id, exc_info=True)
+
+
+def should_backfill(team_id: uuid.UUID) -> bool:
+    if not settings.openai_api_key or team_id in _running:
+        return False
+    return time.monotonic() - _last_attempt.get(team_id, -RETRY_AFTER_S) >= RETRY_AFTER_S
+
+
+async def backfill(team_id: uuid.UUID) -> None:
+    """Draw sheets for team members whose avatar predates the rig."""
+    if team_id in _running:
+        return
+    _running.add(team_id)
+    _last_attempt[team_id] = time.monotonic()
+    try:
+        async with async_session() as db:
+            pending = (
+                await db.execute(
+                    select(Avatar.athlete_id)
+                    .join(Membership, Membership.athlete_id == Avatar.athlete_id)
+                    .outerjoin(AvatarRig, AvatarRig.athlete_id == Avatar.athlete_id)
+                    .where(
+                        Membership.team_id == team_id,
+                        Membership.visible.is_(True),
+                        Avatar.image.is_not(None),
+                        AvatarRig.athlete_id.is_(None),
+                    )
+                    .limit(BACKFILL_PER_RUN)
+                )
+            ).scalars().all()
+        for athlete_id in pending:
+            await refresh(athlete_id)
+    finally:
+        _running.discard(team_id)
