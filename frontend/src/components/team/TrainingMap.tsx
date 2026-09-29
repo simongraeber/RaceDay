@@ -29,7 +29,8 @@ function pointAt(path: [number, number][], lengths: number[], progress: number):
   const t = (target - lengths[i - 1]) / span
   const [lat1, lng1] = path[i - 1]
   const [lat2, lng2] = path[i]
-  return [lat1 + (lat2 - lat1) * t, lng1 + (lng2 - lng1) * t, lng2 < lng1]
+  // The character art faces west, so mirror it when the runner heads east
+  return [lat1 + (lat2 - lat1) * t, lng1 + (lng2 - lng1) * t, lng2 > lng1]
 }
 
 export default function TrainingMap({ teamId }: { teamId: string }) {
@@ -48,10 +49,16 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
     let cancelled = false
     let frame = 0
     let map: any = null
+    let onError: (() => void) | null = null
+    let kit: any = null
 
     loadMapkit()
       .then((mapkit) => {
         if (cancelled || !container.current) return
+        // A token for another domain only fails once MapKit tries to draw
+        kit = mapkit
+        onError = () => setFailed(true)
+        mapkit.addEventListener("error", onError)
         map = new mapkit.Map(container.current, {
           showsCompass: mapkit.FeatureVisibility.Hidden,
           showsZoomControl: true,
@@ -97,7 +104,7 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
           const annotation = new mapkit.Annotation(
             new mapkit.Coordinate(track.path[0][0], track.path[0][1]),
             () => element,
-            { anchorOffset: new DOMPoint(seen * 18, -20) },
+            { anchorOffset: new DOMPoint(seen * 18, -32) },
           )
           return {
             track,
@@ -118,9 +125,9 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
           last = now
           for (const sprite of sprites) {
             const progress = ((now - start) % sprite.duration) / sprite.duration
-            const [lat, lng, left] = pointAt(sprite.track.path, sprite.lengths, progress)
+            const [lat, lng, mirrored] = pointAt(sprite.track.path, sprite.lengths, progress)
             sprite.annotation.coordinate = new mapkit.Coordinate(lat, lng)
-            sprite.element.firstElementChild?.classList.toggle("is-left", left)
+            sprite.element.firstElementChild?.classList.toggle("is-mirrored", mirrored)
           }
         }
         frame = requestAnimationFrame(step)
@@ -130,6 +137,7 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
     return () => {
       cancelled = true
       cancelAnimationFrame(frame)
+      if (onError) kit?.removeEventListener("error", onError)
       roots.forEach((root) => queueMicrotask(() => root.unmount()))
       map?.destroy()
     }

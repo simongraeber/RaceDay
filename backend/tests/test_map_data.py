@@ -33,7 +33,7 @@ class MapDataTests(unittest.TestCase):
         self.assertNotEqual(groups[3], groups[0])
 
     def test_build_uses_newest_run_per_runner(self):
-        rows = [(Athlete(id=1, firstname="Simon", lastname="G"), None)]
+        rows = [(Athlete(id=1, firstname="Simon", lastname="G"), None, None)]
         runs = [
             _Run(1, NOW, 8000, 2400, path(48.1, 11.5)),
             _Run(1, NOW - timedelta(days=2), 12000, 3600, path(48.2, 11.6)),
@@ -47,9 +47,11 @@ class MapDataTests(unittest.TestCase):
 
     def test_generated_avatar_is_team_scoped(self):
         avatar_id = uuid.UUID("11111111-1111-4111-8111-111111111111")
-        rows = [(Athlete(id=1, firstname="Simon", lastname="G"), avatar_id)]
+        rig_id = uuid.UUID("22222222-2222-4222-8222-222222222222")
+        rows = [(Athlete(id=1, firstname="Simon", lastname="G"), avatar_id, rig_id)]
         view = build(TEAM, rows, [_Run(1, NOW, 8000, 2400, path(48.1, 11.5))], NOW)
         self.assertEqual(view.tracks[0].avatar_url, f"/api/v1/teams/{TEAM}/avatars/{avatar_id}")
+        self.assertEqual(view.tracks[0].rig_url, f"/api/v1/teams/{TEAM}/rigs/{rig_id}")
 
 
 if __name__ == "__main__":

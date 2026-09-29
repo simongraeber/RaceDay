@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,9 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_athlete
 from app.config import settings
 from app.database import get_db
-from app.models import Athlete, Avatar, Membership
+from app.models import Athlete, Avatar, AvatarRig, Membership
 from app.services import avatar as images
-from app.services import team_cache
+from app.services import rig, team_cache
 
 router = APIRouter(tags=["avatars"])
 
@@ -37,6 +48,7 @@ def require_site_origin(request: Request) -> None:
 @router.post("/avatars/me", response_model=AvatarOut)
 async def create_avatar(
     request: Request,
+    background: BackgroundTasks,
     photo: UploadFile = File(...),
     description: str = Form("", max_length=300),
     athlete: Athlete = Depends(get_current_athlete),
@@ -71,6 +83,7 @@ async def create_avatar(
     db.add(avatar)
     await db.commit()
     team_cache.clear()
+    background.add_task(rig.refresh, athlete.id)
     return AvatarOut(url="/api/v1/avatars/me")
 
 
@@ -89,8 +102,23 @@ async def delete_avatar(request: Request, athlete: Athlete = Depends(get_current
     avatar = await db.get(Avatar, athlete.id)
     if avatar:
         avatar.image = None
+        rigged = await db.get(AvatarRig, athlete.id)
+        if rigged:
+            await db.delete(rigged)
         await db.commit()
         team_cache.clear()
+
+
+@router.get("/teams/{team_id}/rigs/{rig_id}")
+async def team_rig(team_id: uuid.UUID, rig_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    image = await db.scalar(
+        select(AvatarRig.image)
+        .join(Membership, Membership.athlete_id == AvatarRig.athlete_id)
+        .where(Membership.team_id == team_id, Membership.visible.is_(True), AvatarRig.id == rig_id)
+    )
+    if image is None:
+        raise HTTPException(status_code=404, detail="Character sheet not found")
+    return Response(image, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/teams/{team_id}/avatars/{avatar_id}")

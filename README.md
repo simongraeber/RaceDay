@@ -171,6 +171,7 @@ Team (uuid, name, race_name, race_date, race_distance_m, created_by)
   └── Membership (team_id, athlete_id, visible, goal_seconds)
 Athlete (strava_id, name, avatar, scope, refresh_token_enc, access_token_enc, expires_at)
   └── Avatar (athlete_id, uuid, generated_image)  -- optional, original photo discarded
+  └── AvatarRig (athlete_id, uuid, image)  -- 682x1024 character sheet, body parts for the map rig
   └── CardImage (athlete_id, card_key, uuid, image)  -- avatar restyled per highlight card, generated once
   └── Activity (athlete_id, strava_id, start_date, distance, moving_time,
                 elevation, summary_polyline)  -- public runs only, start/end trimmed
@@ -191,6 +192,14 @@ copies the team's visible runs into a throwaway in-memory SQLite database with r
 results at 50 rows. Postgres is never queried with model-written SQL. Flow as in SIU: SQL → one retry on error
 → answer as UI components (optionally one follow-up query); ids are swapped back to names and our own avatar
 URLs server-side.
+
+**Running characters.** Right after an avatar is accepted, it goes back to `images/edits` together with
+`ReferenceDecomposed.png`, a 682x1024 sheet showing one character cut into parts. The prompt demands the exact
+same layout — same box, scale and rotation per part — and only restyles them, so the fixed slicing keeps working.
+The frontend rig ([RiggedRunner.tsx](frontend/src/components/team/RiggedRunner.tsx)) cuts the sheet by those
+boxes, nests the parts at their mounting points (hip → knee → ankle, shoulder → elbow) and animates each joint
+with CSS, so a new sprite style only needs a new sheet. Z-order from front to back: head, front arm, front leg,
+torso, back leg, back arm.
 
 **Training map.** Apple Maps (MapKit JS). All stored routes of the last 12 months are drawn as translucent
 polylines, so repeated streets glow — a heat map without a heat-map layer. On top, each runner's newest run

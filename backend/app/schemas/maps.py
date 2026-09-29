@@ -7,6 +7,8 @@ class TrackOut(BaseModel):
     name: str
     avatar_url: str | None
     avatar_is_generated: bool
+    # Character sheet for the running rig; falls back to the plain avatar when missing
+    rig_url: str | None
     date: date
     distance_km: float
     duration_s: int
