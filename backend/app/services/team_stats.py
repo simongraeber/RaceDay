@@ -1,6 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from math import log2
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,19 @@ from app.services import team_cache
 WINDOW = timedelta(days=7)
 PREDICTION_WINDOW = timedelta(days=84)
 HISTORY_WINDOW = timedelta(days=365)
+# Riegel's 1.06 was fitted to races at similar distances; it is famously optimistic when
+# extrapolating far, so the exponent grows with the extrapolation factor.
 RIEGEL_EXPONENT = 1.06
+RIEGEL_MAX_EXPONENT = 1.15
+RIEGEL_FADE_PER_DOUBLING = 0.03
+# Riegel also assumes race-specific endurance training: a fast 10 km says little about a
+# half marathon if the longest run is 8 km.
+LONG_RUN_TARGET = 0.8  # of the race distance
+WEEKLY_KM_PER_RACE_KM = 2.0
+MAX_ENDURANCE_PENALTY = 0.12
+FRESH_DAYS = 28
+STALE_PENALTY_PER_WEEK = 0.004
+MAX_STALE_PENALTY = 0.05
 EIFFEL_TOWER_M = 330
 
 
@@ -47,26 +60,60 @@ def best_km(run: Run) -> int | None:
     return min(times) if times else None
 
 
-def predict_finish(efforts: list[tuple[float, int]], distance_m: int) -> int | None:
-    """Riegel projection from the best qualifying effort (5 km+ and within 4x the race distance)."""
+def riegel_exponent(ratio: float) -> float:
+    if ratio <= 1:
+        return RIEGEL_EXPONENT
+    return min(RIEGEL_MAX_EXPONENT, RIEGEL_EXPONENT + RIEGEL_FADE_PER_DOUBLING * log2(ratio))
+
+
+def endurance_factor(weekly_km: float, longest_run_m: float, race_distance_m: int) -> float:
+    """Extra time for runners whose long runs and weekly volume don't back the race distance yet."""
+    long_gap = max(0.0, 1 - longest_run_m / (race_distance_m * LONG_RUN_TARGET))
+    volume_gap = max(0.0, 1 - weekly_km / (race_distance_m / 1000 * WEEKLY_KM_PER_RACE_KM))
+    return 1 + MAX_ENDURANCE_PENALTY * (0.6 * long_gap + 0.4 * volume_gap)
+
+
+def stale_factor(age_days: float) -> float:
+    return 1 + min(MAX_STALE_PENALTY, STALE_PENALTY_PER_WEEK * max(0.0, age_days - FRESH_DAYS) / 7)
+
+
+def predict_finish(
+    efforts: list[tuple[float, int, float]],
+    distance_m: int,
+    weekly_km: float = 0.0,
+    longest_run_m: float = 0.0,
+) -> int | None:
+    """Riegel projection, damped by extrapolation distance, endurance base and effort age."""
+    endurance = endurance_factor(weekly_km, longest_run_m, distance_m)
     candidates = [
-        round(seconds * (distance_m / meters) ** RIEGEL_EXPONENT)
-        for meters, seconds in efforts
+        seconds * (distance_m / meters) ** riegel_exponent(distance_m / meters) * endurance * stale_factor(age_days)
+        for meters, seconds, age_days in efforts
         if seconds > 0
         and meters >= min(5000, distance_m / 3)
         and meters <= distance_m * 1.5
         and distance_m / meters <= 4
     ]
-    return min(candidates) if candidates else None
+    if not candidates:
+        return None
+    # Median of the three best efforts: one lucky downhill run should not set the goal time
+    best = sorted(candidates)[:3]
+    return round(best[len(best) // 2])
 
 
-def race_efforts(runs: list[Run], since: datetime) -> list[tuple[float, int]]:
+def race_efforts(runs: list[Run], now: datetime) -> list[tuple[float, int, float]]:
+    """(metres, seconds, age in days) for whole runs and their best efforts within the window."""
+    since = now - PREDICTION_WINDOW
     efforts = []
     for run in runs:
         if run.start < since:
             continue
-        efforts.append((run.distance_m, run.moving_time_s))
-        efforts.extend((e["distance"], e["elapsed_time"]) for e in run.best_efforts if e.get("distance") and e.get("elapsed_time"))
+        age = (now - run.start).total_seconds() / 86_400
+        efforts.append((run.distance_m, run.moving_time_s, age))
+        efforts.extend(
+            (e["distance"], e["elapsed_time"], age)
+            for e in run.best_efforts
+            if e.get("distance") and e.get("elapsed_time")
+        )
     return efforts
 
 
@@ -157,7 +204,13 @@ def summarize(team: Team, rows: list[tuple], runs_by_athlete: dict[int, list[Run
         recent = [r for r in runs if r.start >= window_start]
         window_runs[athlete.display_name] = recent
         twelve_weeks = [r for r in runs if r.start >= now - PREDICTION_WINDOW]
-        prediction = predict_finish(race_efforts(runs, now - PREDICTION_WINDOW), team.race_distance_m) if race_ahead else None
+        longest_run_m = max((r.distance_m for r in twelve_weeks), default=0)
+        last_4_weeks_km = round(sum(r.distance_m for r in runs if r.start >= now - timedelta(days=28)) / 1000, 1)
+        prediction = (
+            predict_finish(race_efforts(runs, now), team.race_distance_m, last_4_weeks_km / 4, longest_run_m)
+            if race_ahead
+            else None
+        )
         member = MemberOut(
             name=athlete.display_name,
             avatar_url=f"/api/v1/teams/{team.id}/avatars/{avatar_id}" if avatar_id else athlete.avatar_url,
@@ -165,7 +218,7 @@ def summarize(team: Team, rows: list[tuple], runs_by_athlete: dict[int, list[Run
             goal_seconds=membership.goal_seconds,
             km_7d=round(sum(r.distance_m for r in recent) / 1000, 1),
             runs_7d=len(recent),
-            last_4_weeks_km=round(sum(r.distance_m for r in runs if r.start >= now - timedelta(days=28)) / 1000, 1),
+            last_4_weeks_km=last_4_weeks_km,
             prediction_seconds=prediction,
             best_km_seconds=_min_or_none(best_km(r) for r in twelve_weeks),
             recent_runs=[
@@ -182,7 +235,7 @@ def summarize(team: Team, rows: list[tuple], runs_by_athlete: dict[int, list[Run
             "km_last_7_days": member.km_7d,
             "runs_last_7_days": member.runs_7d,
             "km_last_4_weeks": member.last_4_weeks_km,
-            "longest_run_last_12_weeks_km": round(max((r.distance_m for r in twelve_weeks), default=0) / 1000, 1),
+            "longest_run_last_12_weeks_km": round(longest_run_m / 1000, 1),
             "days_since_last_run": (now - runs[0].start).days if runs else None,
             "predicted_finish_s": prediction,
             "goal_finish_s": membership.goal_seconds,
