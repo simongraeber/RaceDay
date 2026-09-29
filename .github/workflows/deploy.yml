@@ -31,13 +31,13 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Check backend imports
+      - name: Check backend imports and avatar tests
         working-directory: backend
         env:
           # Dummy values, only needed so settings load
           TOKEN_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
           SESSION_SECRET: ci
-        run: pip install -r requirements.txt && python -c "import app.main"
+        run: pip install -r requirements.txt && python -c "import app.main" && python -m unittest discover -s tests -v
 
   deploy:
     needs: build

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_athlete, get_optional_athlete
 from app.database import get_db
-from app.models import Activity, Athlete, Membership, Team
+from app.models import Activity, Athlete, Avatar, Membership, Team
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -24,6 +24,14 @@ class TeamCreated(BaseModel):
     id: uuid.UUID
 
 
+class MyTeamOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    race_name: str
+    race_date: date
+    race_distance_m: int
+
+
 class MemberOut(BaseModel):
     name: str
     avatar_url: str | None
@@ -37,6 +45,8 @@ class MemberOut(BaseModel):
 class ViewerOut(BaseModel):
     visible: bool
     goal_seconds: int | None
+    avatar_url: str | None
+    has_avatar: bool
 
 
 class TeamOut(BaseModel):
@@ -81,6 +91,20 @@ async def create_team(
     return TeamCreated(id=team.id)
 
 
+@router.get("/mine", response_model=list[MyTeamOut])
+async def my_teams(
+    athlete: Athlete = Depends(get_current_athlete),
+    db: AsyncSession = Depends(get_db),
+):
+    teams = await db.scalars(
+        select(Team)
+        .join(Membership, Membership.team_id == Team.id)
+        .where(Membership.athlete_id == athlete.id)
+        .order_by(Team.race_date, Team.name)
+    )
+    return [MyTeamOut.model_validate(team, from_attributes=True) for team in teams]
+
+
 @router.get("/{team_id}", response_model=TeamOut)
 async def get_team(
     team_id: uuid.UUID,
@@ -92,8 +116,9 @@ async def get_team(
 
     rows = (
         await db.execute(
-            select(Athlete, Membership)
+            select(Athlete, Membership, Avatar.id)
             .join(Membership, Membership.athlete_id == Athlete.id)
+            .outerjoin(Avatar, (Avatar.athlete_id == Athlete.id) & Avatar.image.is_not(None))
             .where(Membership.team_id == team.id, Membership.visible.is_(True))
             .order_by(Membership.joined_at)
         )
@@ -112,18 +137,18 @@ async def get_team(
                     func.sum(Activity.distance_m).filter(Activity.start_date >= four_weeks_ago), 0
                 ).label("recent"),
             )
-            .where(Activity.athlete_id.in_([a.id for a, _ in rows]))
+            .where(Activity.athlete_id.in_([a.id for a, _, _ in rows]))
             .group_by(Activity.athlete_id)
         )
     }
 
     members = []
-    for athlete, membership in rows:
+    for athlete, membership, avatar_id in rows:
         s = stats.get(athlete.id)
         members.append(
             MemberOut(
                 name=athlete.display_name,
-                avatar_url=athlete.avatar_url,
+                avatar_url=(f"/api/v1/teams/{team.id}/avatars/{avatar_id}" if avatar_id else athlete.avatar_url),
                 goal_seconds=membership.goal_seconds,
                 runs=s.runs if s else 0,
                 total_km=round(s.total / 1000, 1) if s else 0,
@@ -136,7 +161,15 @@ async def get_team(
     if viewer is not None:
         own = await db.get(Membership, (team.id, viewer.id))
         if own is not None:
-            viewer_out = ViewerOut(visible=own.visible, goal_seconds=own.goal_seconds)
+            avatar_id = await db.scalar(
+                select(Avatar.id).where(Avatar.athlete_id == viewer.id, Avatar.image.is_not(None))
+            )
+            viewer_out = ViewerOut(
+                visible=own.visible,
+                goal_seconds=own.goal_seconds,
+                avatar_url="/api/v1/avatars/me" if avatar_id else viewer.avatar_url,
+                has_avatar=avatar_id is not None,
+            )
 
     return TeamOut(
         name=team.name,
@@ -159,7 +192,15 @@ async def update_membership(
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(membership, field, value)
     await db.commit()
-    return ViewerOut(visible=membership.visible, goal_seconds=membership.goal_seconds)
+    avatar_id = await db.scalar(
+        select(Avatar.id).where(Avatar.athlete_id == athlete.id, Avatar.image.is_not(None))
+    )
+    return ViewerOut(
+        visible=membership.visible,
+        goal_seconds=membership.goal_seconds,
+        avatar_url="/api/v1/avatars/me" if avatar_id else athlete.avatar_url,
+        has_avatar=avatar_id is not None,
+    )
 
 
 @router.delete("/{team_id}/me", status_code=status.HTTP_204_NO_CONTENT)

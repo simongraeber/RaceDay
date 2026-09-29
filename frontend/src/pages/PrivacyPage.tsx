@@ -51,34 +51,43 @@ export default function PrivacyPage() {
           remove the first and last 200 metres of every route before storing it.
         </p>
 
-        <h2>5. Who can see your data</h2>
+        <h2>5. Optional AI avatar</h2>
         <p>
-          Your first name, last initial, profile picture, run statistics, and routes are{" "}
+          If you choose to make a runner avatar, we send the photo you upload and your optional
+          description to OpenAI for image generation, together with a fixed character style reference.
+          RaceDay does not store your original photo. We store the generated avatar until you remove
+          it or delete your account. OpenAI processes your photo under its own privacy terms; do not
+          upload someone else's photo without their permission.
+        </p>
+
+        <h2>6. Who can see your data</h2>
+        <p>
+          Your first name, last initial, profile picture or generated avatar, run statistics, and routes are{" "}
           <strong>visible to anyone who has the link to your team</strong>. Team links are not listed
           or searchable. You can hide yourself from a team at any time.
         </p>
 
-        <h2>6. Cookies</h2>
+        <h2>7. Cookies</h2>
         <p>
           We use two strictly necessary cookies: a short-lived one to secure the Strava login, and a
           session cookie that keeps you logged in for up to 30 days.
         </p>
 
-        <h2>7. Legal basis and retention</h2>
+        <h2>8. Legal basis and retention</h2>
         <p>
           Processing is based on your consent (Art. 6(1)(a) GDPR), given when you connect Strava. We
           keep your data until you delete your account or revoke RaceDay's access in your Strava
           settings, after which it is deleted.
         </p>
 
-        <h2>8. Your rights</h2>
+        <h2>9. Your rights</h2>
         <p>
           You have the right to access, rectify, or delete your data, to restrict or object to its
           processing, to data portability, and to withdraw consent at any time. You also have the
           right to lodge a complaint with a supervisory authority. Contact us at {EMAIL}.
         </p>
 
-        <h2>9. Changes</h2>
+        <h2>10. Changes</h2>
         <p>We may update this policy. The current version is always published here.</p>
       </div>
 

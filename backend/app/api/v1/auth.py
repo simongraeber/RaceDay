@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_athlete
 from app.config import settings
 from app.database import get_db
-from app.models import Athlete, Membership, Team
+from app.models import Athlete, Avatar, Membership, Team
 from app.security import (
     SESSION_COOKIE,
     STATE_COOKIE,
@@ -95,6 +95,12 @@ async def strava_callback(
     strava.store_tokens(athlete, tokens)
 
     target = "/new"
+    if payload["intent"] == "create":
+        existing_team = await db.scalar(
+            select(Membership.team_id).where(Membership.athlete_id == athlete.id).limit(1)
+        )
+        if existing_team is not None:
+            target = "/teams"
     if payload["intent"] == "join":
         team = await db.get(Team, uuid.UUID(team_id))
         if team is None:
@@ -136,7 +142,14 @@ async def me(
     team_ids = await db.scalars(
         select(Membership.team_id).where(Membership.athlete_id == athlete.id)
     )
-    return MeOut(name=athlete.display_name, avatar_url=athlete.avatar_url, teams=list(team_ids))
+    avatar_id = await db.scalar(
+        select(Avatar.id).where(Avatar.athlete_id == athlete.id, Avatar.image.is_not(None))
+    )
+    return MeOut(
+        name=athlete.display_name,
+        avatar_url="/api/v1/avatars/me" if avatar_id else athlete.avatar_url,
+        teams=list(team_ids),
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

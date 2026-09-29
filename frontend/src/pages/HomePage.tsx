@@ -1,10 +1,12 @@
 import { motion } from "framer-motion"
-import { useSearchParams } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { Flag, Link2, Lock, Map as MapIcon, Share2, Timer, Trophy, Users } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import StravaConnectButton from "@/components/StravaConnectButton"
-import { stravaLoginUrl } from "@/lib/api"
+import { api, stravaLoginUrl, type Me } from "@/lib/api"
 import { fadeUp, staggerContainer } from "@/lib/animations"
 
 const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
@@ -29,6 +31,11 @@ const ERRORS: Record<string, string> = {
 export default function HomePage() {
   const [params] = useSearchParams()
   const error = ERRORS[params.get("error") ?? ""]
+  const [me, setMe] = useState<Me | null>(null)
+
+  useEffect(() => {
+    api.me().then(setMe).catch(() => setMe(null))
+  }, [])
 
   return (
     <div>
@@ -42,8 +49,14 @@ export default function HomePage() {
           and who's really ready for the start line.
         </motion.p>
         <motion.div variants={fadeUp} className="flex flex-col items-center gap-3">
-          <StravaConnectButton href={stravaLoginUrl("create")} />
-          <span className="text-sm text-muted-foreground">to start a new team</span>
+          {me ? (
+            <Button size="lg" asChild><Link to="/teams">My teams</Link></Button>
+          ) : (
+            <>
+              <StravaConnectButton href={stravaLoginUrl("create")} />
+              <span className="text-sm text-muted-foreground">to start a new team</span>
+            </>
+          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
         </motion.div>
       </motion.section>
