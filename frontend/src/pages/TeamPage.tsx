@@ -67,10 +67,6 @@ export default function TeamPage() {
           </Card>
         )}
 
-        <WeeklyHighlights highlights={team.highlights} teamName={team.name} />
-
-        <CoachCard coach={team.coach} />
-
         <section aria-labelledby="runners-heading">
           <div className="mb-5 flex items-end justify-between gap-4">
             <div>
@@ -90,6 +86,8 @@ export default function TeamPage() {
           )}
         </section>
 
+        <CoachCard coach={team.coach} />
+
         <section aria-labelledby="training-map-heading" className="border-t border-border pt-6">
           <h2 id="training-map-heading" className="mb-4 text-lg font-semibold">Training map</h2>
           <div className="flex h-44 items-center justify-center gap-3 border border-dashed border-border text-sm text-muted-foreground">
@@ -97,13 +95,15 @@ export default function TeamPage() {
           </div>
         </section>
 
+        <WeeklyHighlights highlights={team.highlights} teamName={team.name} />
+
+        {team.viewer && <AskAI teamId={teamId} />}
+
         {team.viewer ? (
           <MemberPanel teamId={teamId} viewer={team.viewer} openAvatar={joined} onChange={load} />
         ) : (
           <JoinTeamCard teamId={teamId} />
         )}
-
-        {team.viewer && <AskAI teamId={teamId} />}
 
         <p className="text-center text-xs text-muted-foreground">Powered by Strava</p>
       </div>

@@ -171,6 +171,7 @@ Team (uuid, name, race_name, race_date, race_distance_m, created_by)
   └── Membership (team_id, athlete_id, visible, goal_seconds)
 Athlete (strava_id, name, avatar, scope, refresh_token_enc, access_token_enc, expires_at)
   └── Avatar (athlete_id, uuid, generated_image)  -- optional, original photo discarded
+  └── CardImage (athlete_id, card_key, uuid, image)  -- avatar restyled per highlight card, generated once
   └── Activity (athlete_id, strava_id, start_date, distance, moving_time,
                 elevation, summary_polyline)  -- public runs only, start/end trimmed
         └── ActivityDetail (best_efforts, splits, kudos, pr_count, streams)  -- trimmed, no heart rate

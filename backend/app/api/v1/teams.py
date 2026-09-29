@@ -1,14 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_athlete, get_optional_athlete
 from app.database import get_db
-from app.models import Athlete, Avatar, Membership, Team, TeamCoachNote
+from app.models import Athlete, Avatar, CardImage, Membership, Team, TeamCoachNote
 from app.schemas.teams import MembershipUpdate, MyTeamOut, TeamCreate, TeamCreated, TeamOut, ViewerOut
-from app.services import coach, team_cache
+from app.services import card_art, coach, team_cache
 from app.services.team_stats import load_team_view
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -83,6 +83,8 @@ async def get_team(
     note = await db.get(TeamCoachNote, team.id)
     if coach.should_refresh(team.id, view, note):
         background.add_task(coach.refresh, team.id)
+    if card_art.should_refresh(team.id, view):
+        background.add_task(card_art.refresh, team.id)
 
     viewer_out = None
     if viewer is not None:
@@ -126,3 +128,15 @@ async def leave_team(
     await db.delete(await _get_membership(db, team_id, athlete))
     await db.commit()
     team_cache.clear()
+
+
+@router.get("/{team_id}/cards/{image_id}")
+async def card_image(team_id: uuid.UUID, image_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    image = await db.scalar(
+        select(CardImage.image)
+        .join(Membership, Membership.athlete_id == CardImage.athlete_id)
+        .where(Membership.team_id == team_id, Membership.visible.is_(True), CardImage.id == image_id)
+    )
+    if image is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return Response(image, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})

@@ -1,4 +1,5 @@
 import unittest
+import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from app.models import Athlete, Membership, Team
@@ -78,6 +79,16 @@ class TeamStatsTests(unittest.TestCase):
     def test_no_cards_without_recent_runs(self):
         view = summarize(team(), [member(1, "Simon")], {1: [run(10000, 3000, 10)]}, NOW)
         self.assertEqual(view.highlights.cards, [])
+
+    def test_card_art_is_linked_and_missing_art_reported(self):
+        runs = {1: [run(8000, 2400, 1)], 2: [run(5000, 1400, 2)]}
+        art = {(1, "longest"): uuid.UUID("11111111-1111-4111-8111-111111111111")}
+        view = summarize(team(), [member(1, "Simon"), member(2, "Anna")], runs, NOW, art)
+        cards = {c.key: c for c in view.highlights.cards}
+        self.assertTrue(cards["longest"].image_url.endswith("/cards/11111111-1111-4111-8111-111111111111"))
+        self.assertIsNone(cards["time"].image_url)
+        self.assertNotIn((1, "longest"), view.art_wanted)
+        self.assertIn((1, "fastest_km" if "fastest_km" in cards else "volume"), view.art_wanted)
 
     def test_no_prediction_after_race_day(self):
         view = summarize(team(date(2026, 4, 4)), [member(1, "Simon")], {1: [run(10000, 3000, 1)]}, NOW)

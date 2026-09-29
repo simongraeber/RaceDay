@@ -61,6 +61,12 @@ export default function PrivacyPage() {
           it or delete your account. OpenAI processes your photo under its own privacy terms; do not
           upload someone else's photo without their permission.
         </p>
+        <p>
+          If you have an avatar, we also send it to OpenAI to draw a few playful variations of your
+          character for the highlight cards (for example sweating after the longest run). Each variation
+          is generated once, stored with your avatar and removed together with it. No training data,
+          names or photos are sent with it.
+        </p>
 
         <h2>6. AI coach comments</h2>
         <p>
