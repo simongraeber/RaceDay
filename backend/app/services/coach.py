@@ -54,17 +54,17 @@ _last_attempt: dict[uuid.UUID, float] = {}
 
 def fallback_notes(view: TeamView) -> list[CoachNoteOut]:
     """Rule-based roasts for when AI is off or hasn't run yet."""
-    top_km = max((m.week_km for _, m in view.members), default=0)
+    top_km = max((m.km_7d for _, m in view.members), default=0)
     notes = []
     for athlete_id, member in view.members:
         f = view.facts[athlete_id]
         if not f["km_last_4_weeks"]:
             text = f"{member.name} has entered stealth mode. Nobody has seen a single run."
-        elif not f["runs_this_week"]:
+        elif not f["runs_last_7_days"]:
             text = f"{member.name} apparently believes last week's runs still count."
         elif f["goal_finish_s"] and f["predicted_finish_s"] and f["predicted_finish_s"] > f["goal_finish_s"]:
             text = f"{member.name}'s goal time and current form are not on speaking terms."
-        elif member.week_km == top_km:
+        elif member.km_7d == top_km:
             text = f"{member.name} is training like the race is tomorrow. Save some for race day."
         else:
             text = f"{member.name} is doing fine. Suspiciously fine."

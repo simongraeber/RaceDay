@@ -37,19 +37,28 @@ class TeamStatsTests(unittest.TestCase):
         )
         self.assertEqual(efforts, [(12000, 3900), (10000, 3000)])
 
-    def test_summary_uses_true_fastest_kilometre_this_week(self):
+    def test_rolling_seven_day_cards(self):
         runs = {
-            1: [run(8000, 2400, 1, [{"distance": 1000, "elapsed_time": 260}])],
-            2: [run(5000, 1400, 2, [{"distance": 1000, "elapsed_time": 245}]), run(20000, 6000, 20)],
+            1: [run(8000, 2400, 1, [{"distance": 1000, "elapsed_time": 260}]), run(30000, 9000, 8)],
+            2: [run(5000, 1400, 6.5, [{"distance": 1000, "elapsed_time": 245}]), run(20000, 6000, 20)],
+            3: [],
         }
-        view = summarize(team(), [member(1, "Simon", 6000), member(2, "Anna")], runs, NOW)
+        view = summarize(team(), [member(1, "Simon", 6000), member(2, "Anna"), member(3, "Max")], runs, NOW)
         h = view.highlights
-        self.assertEqual((h.week_runs, h.week_km, h.week_kudos, h.week_elevation_m), (2, 13.0, 4, 80))
-        self.assertEqual((h.fastest_km_seconds, h.fastest_km_runner), (245, "Anna X."))
-        self.assertEqual((h.longest_run_km, h.longest_runner), (8.0, "Simon X."))
+        cards = {c.key: c for c in h.cards}
+        self.assertEqual((h.window_days, h.total_runs, h.total_km), (7, 2, 13.0))
+        self.assertEqual((cards["fastest_km"].value, cards["fastest_km"].detail), ("4:05", "Anna X."))
+        self.assertEqual((cards["longest"].value, cards["longest"].detail), ("8.0 km", "Simon X."))
+        self.assertEqual(cards["kudos"].value, "4")
+        self.assertEqual(cards["missing"].detail, "Max X.")
         self.assertEqual(view.facts[1]["goal_finish_s"], 6000)
         self.assertEqual(view.facts[2]["km_last_4_weeks"], 25.0)
         self.assertEqual(view.members[1][1].best_km_seconds, 245)
+        self.assertEqual(view.members[0][1].runs_7d, 1)
+
+    def test_no_cards_without_recent_runs(self):
+        view = summarize(team(), [member(1, "Simon")], {1: [run(10000, 3000, 10)]}, NOW)
+        self.assertEqual(view.highlights.cards, [])
 
     def test_no_prediction_after_race_day(self):
         view = summarize(team(date(2026, 4, 4)), [member(1, "Simon")], {1: [run(10000, 3000, 1)]}, NOW)

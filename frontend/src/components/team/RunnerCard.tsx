@@ -25,7 +25,7 @@ export default function RunnerCard({ member, index }: { member: Member; index: n
             {member.prediction_seconds ? formatDuration(member.prediction_seconds) : "—"}
           </p>
           <p className="mt-2 flex items-center gap-1 text-xs opacity-75">
-            <ArrowUpRight className="size-3.5" />{member.week_km.toFixed(1)} km this week
+            <ArrowUpRight className="size-3.5" />{member.km_7d.toFixed(1)} km last 7 days
           </p>
           {member.best_km_seconds && (
             <p className="mt-1 flex items-center gap-1 text-xs opacity-75">

@@ -37,29 +37,43 @@ export interface Member {
   avatar_url: string | null
   avatar_is_generated: boolean
   goal_seconds: number | null
-  week_km: number
-  week_runs: number
+  km_7d: number
+  runs_7d: number
   last_4_weeks_km: number
   prediction_seconds: number | null
   best_km_seconds: number | null
   recent_runs: { date: string; distance_km: number; pace_seconds_km: number | null }[]
 }
 
+export interface StatCard {
+  key: string
+  icon: string
+  label: string
+  value: string
+  detail: string
+}
+
 export interface Highlights {
-  week_start: string
-  week_km: number
-  week_time_s: number
-  week_runs: number
-  week_elevation_m: number
-  week_kudos: number
-  longest_run_km: number
-  longest_runner: string | null
-  fastest_km_seconds: number | null
-  fastest_km_runner: string | null
-  fastest_pace_seconds_km: number | null
-  fastest_runner: string | null
-  most_runs: number
-  most_runs_runner: string | null
+  window_days: number
+  total_km: number
+  total_runs: number
+  cards: StatCard[]
+}
+
+type Images = { image_urls?: string[] }
+
+export type AIComponent =
+  | { type: "ranked-list"; icon: string; title: string; items: ({ label: string; value: string } & Images)[] }
+  | ({ type: "stat-highlight"; icon: string; label: string; value: string; subtitle?: string } & Images)
+  | { type: "comparison"; title: string; sides: ({ name: string; stats: { label: string; value: string }[] } & Images)[] }
+  | { type: "bar-chart"; title: string; bars: ({ label: string; value: number } & Images)[] }
+  | { type: "table"; title: string; columns: string[]; rows: Record<string, string | number>[] }
+  | { type: "callout"; emoji: string; text: string }
+  | { type: "head-to-head"; player_a: { name: string } & Images; player_b: { name: string } & Images; stats: { label: string; a: string; b: string }[] }
+
+export interface AskResponse {
+  components: AIComponent[]
+  remaining: number
 }
 
 export interface Coach {
@@ -117,6 +131,11 @@ export const api = {
     }),
   leaveTeam: (id: string) =>
     request<void>(`/teams/${encodeURIComponent(id)}/me`, { method: "DELETE" }),
+  ask: (id: string, question: string) =>
+    request<AskResponse>(`/teams/${encodeURIComponent(id)}/ask`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
 }
 
 export function stravaLoginUrl(intent: "create" | "join", teamId?: string): string {

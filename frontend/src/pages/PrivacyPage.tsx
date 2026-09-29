@@ -69,6 +69,13 @@ export default function PrivacyPage() {
           finish time) under anonymous labels such as “R1”. Names, photos, routes and Strava IDs are
           not sent.
         </p>
+        <p>
+          Team members can also ask the “Ask AI” analyst questions about the team's runs. The question
+          (with runner names replaced by labels like “R1”), the table layout and the query results are
+          sent to OpenAI. The AI only reads a temporary, read-only copy of the visible members' run
+          statistics (dates, distances, times, elevation, kudos, best efforts and splits); it never sees
+          names, photos, GPS routes or Strava accounts and cannot change any data. Questions are not stored.
+        </p>
 
         <h2>7. Who can see your data</h2>
         <p>

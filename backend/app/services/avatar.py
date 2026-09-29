@@ -54,7 +54,7 @@ def to_avatar(raw: bytes) -> bytes:
                 or alpha.getextrema()[1] < 128
             ):
                 raise GenerationFailed("The generated avatar had no transparent background. Please try again")
-            image.thumbnail((768, 768))
+            image.thumbnail((768, 1152))
             output = BytesIO()
             image.save(output, format="PNG", optimize=True)
             return output.getvalue()
@@ -64,11 +64,14 @@ def to_avatar(raw: bytes) -> bytes:
 
 async def generate_avatar(photo: bytes, description: str) -> bytes:
     prompt = (
-        "Create a single friendly 3D cartoon portrait of the runner in the FIRST image. "
-        "Preserve their recognizable facial features, hair and skin tone; render them in running clothes. "
+        "Create a single friendly 3D cartoon character of the runner in the FIRST image. "
+        "FULL BODY, head to toe: the entire figure including both feet and running shoes must be visible, "
+        "standing in a relaxed, confident running pose, centered with a small margin on all sides. "
+        "Never crop at the waist, knees or ankles. "
+        "Preserve their recognizable facial features, hair and skin tone; dress them in running clothes. "
         "Use the SECOND image only as the visual style reference: match its character proportions, "
-        "material, lighting and level of detail. Center the character with clean studio lighting. "
-        "Full upper-body character, no rectangular backdrop; transparent background. "
+        "material, lighting and level of detail. Clean studio lighting. "
+        "Transparent background, no floor, no shadow plate, no rectangular backdrop. "
         "No text, logos or other people. "
         f"Optional runner details: {description.strip()[:300]}"
     )
@@ -80,7 +83,7 @@ async def generate_avatar(photo: bytes, description: str) -> bytes:
                 data={
                     "model": "gpt-image-2.5-flare",
                     "prompt": prompt,
-                    "size": "1024x1024",
+                    "size": "1024x1536",
                     "quality": "medium",
                     "output_format": "png",
                     "background": "transparent",
