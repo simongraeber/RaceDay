@@ -40,6 +40,15 @@ def to_avatar(raw: bytes) -> bytes:
     try:
         with Image.open(BytesIO(raw)) as image:
             image = image.convert("RGBA")
+            alpha = image.getchannel("A")
+            corners = [(0, 0), (image.width - 1, 0), (0, image.height - 1), (image.width - 1, image.height - 1)]
+            transparent_pixels = sum(alpha.histogram()[:128])
+            if (
+                any(alpha.getpixel(point) > 16 for point in corners)
+                or transparent_pixels < image.width * image.height * 0.05
+                or alpha.getextrema()[1] < 128
+            ):
+                raise GenerationFailed("The generated avatar had no transparent background. Please try again")
             image.thumbnail((768, 768))
             output = BytesIO()
             image.save(output, format="PNG", optimize=True)
@@ -53,7 +62,7 @@ async def generate_avatar(photo: bytes, description: str) -> bytes:
         "Create a single friendly 3D cartoon portrait of the runner in the FIRST image. "
         "Preserve their recognizable facial features, hair and skin tone; render them in running clothes. "
         "Use the SECOND image only as the visual style reference: match its character proportions, "
-        "material, lighting and level of detail. Center the character against a clean neutral background. "
+        "material, lighting and level of detail. Center the character with clean studio lighting. "
         "Full upper-body character, no rectangular backdrop; transparent background. "
         "No text, logos or other people. "
         f"Optional runner details: {description.strip()[:300]}"
