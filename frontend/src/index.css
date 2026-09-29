@@ -265,7 +265,7 @@ body {
   -webkit-mask-image: linear-gradient(to bottom, #000 45%, rgba(0, 0, 0, 0.45) 68%, transparent 96%);
   mask-image: linear-gradient(to bottom, #000 45%, rgba(0, 0, 0, 0.45) 68%, transparent 96%);
 }
-.runner-avatar--profile { width: 25%; height: auto; aspect-ratio: 1; right: 1rem; top: 1.25rem; object-fit: cover; border-radius: 50%; }
+.runner-avatar--profile { width: 25%; height: auto; aspect-ratio: 1; right: 1rem; top: 1.25rem; object-fit: cover; object-position: top; border-radius: 50%; }
 .runner-initial {
   position: absolute;
   top: 0;
@@ -293,6 +293,106 @@ body {
   .runner-card { transition: none; animation: none; }
   .runner-card:hover { transform: none; }
   .ai-shimmer-spin { animation: none; }
+  .runner-sprite-body { animation: none; }
+}
+
+/* ── Training map ── */
+.training-map {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.training-map-canvas {
+  height: 26rem;
+  width: 100%;
+}
+.training-map-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--background);
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.runner-sprite {
+  position: relative;
+  width: 44px;
+  height: 52px;
+}
+.runner-sprite-body {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform-origin: 50% 90%;
+  animation: sprite-run 520ms steps(1, end) infinite alternate;
+}
+.runner-sprite.is-left .runner-sprite-body { scale: -1 1; }
+.runner-sprite-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom;
+  filter: drop-shadow(0 2px 3px rgba(20, 30, 25, 0.35));
+  user-select: none;
+}
+.runner-sprite-initial {
+  display: grid;
+  height: 30px;
+  width: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.runner-sprite-shadow {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  height: 6px;
+  width: 26px;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: rgba(20, 30, 25, 0.25);
+  filter: blur(2px);
+  animation: sprite-shadow 520ms ease-in-out infinite alternate;
+}
+.runner-sprite-card {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  z-index: 10;
+  margin-bottom: 0.35rem;
+  width: max-content;
+  max-width: 13rem;
+  translate: -50% 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--foreground);
+  box-shadow: 0 6px 18px rgba(20, 30, 25, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.runner-sprite:hover .runner-sprite-card { opacity: 1; }
+
+/* Placeholder run cycle until the sprite sheet lands */
+@keyframes sprite-run {
+  from { transform: translateY(0) rotate(-4deg); }
+  to { transform: translateY(-4px) rotate(4deg); }
+}
+@keyframes sprite-shadow {
+  from { opacity: 0.3; width: 26px; }
+  to { opacity: 0.16; width: 18px; }
 }
 
 /* ── Apple AI Shimmer (same as SIU) ── */

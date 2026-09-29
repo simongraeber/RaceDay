@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_text_model: str = "gpt-5.4-mini"
 
+    # Apple Maps — either a ready-made MapKit JS token, or a .p8 key we sign short-lived tokens with
+    apple_maps_token: str = ""
+    apple_maps_team_id: str = ""
+    apple_maps_key_id: str = ""
+    apple_maps_private_key: str = ""
+
     # Fernet key for Strava tokens at rest
     token_encryption_key: str
     session_secret: str

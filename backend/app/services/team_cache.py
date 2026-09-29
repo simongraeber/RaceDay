@@ -19,3 +19,6 @@ def put(key: Any, value: Any) -> None:
 
 def clear() -> None:
     _entries.clear()
+    from app.services import map_data
+
+    map_data.clear()

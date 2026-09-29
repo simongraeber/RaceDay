@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
-import { ArrowLeft, Check, Copy, MapPinned } from "lucide-react"
+import { ArrowLeft, Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import LoadingState from "@/components/LoadingState"
@@ -11,6 +11,7 @@ import JoinTeamCard from "@/components/team/JoinTeamCard"
 import MemberPanel from "@/components/team/MemberPanel"
 import RaceCountdown from "@/components/team/RaceCountdown"
 import RunnerCard from "@/components/team/RunnerCard"
+import TrainingMap from "@/components/team/TrainingMap"
 import WeeklyHighlights from "@/components/team/WeeklyHighlights"
 import NotFoundPage from "@/pages/NotFoundPage"
 import { api, ApiError, type Team } from "@/lib/api"
@@ -90,9 +91,7 @@ export default function TeamPage() {
 
         <section aria-labelledby="training-map-heading" className="border-t border-border pt-6">
           <h2 id="training-map-heading" className="mb-4 text-lg font-semibold">Training map</h2>
-          <div className="flex h-44 items-center justify-center gap-3 border border-dashed border-border text-sm text-muted-foreground">
-            <MapPinned className="size-5" /> Routes coming soon
-          </div>
+          <TrainingMap teamId={teamId} />
         </section>
 
         <WeeklyHighlights highlights={team.highlights} teamName={team.name} />
