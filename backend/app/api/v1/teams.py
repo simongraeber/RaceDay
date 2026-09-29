@@ -37,7 +37,7 @@ async def _viewer_out(db: AsyncSession, athlete: Athlete, membership: Membership
         goal_seconds=membership.goal_seconds,
         avatar_url="/api/v1/avatars/me" if avatar_id else athlete.avatar_url,
         has_avatar=avatar_id is not None,
-        needs_reconnect="activity:read_all" not in athlete.scope.split(","),
+        needs_reconnect="activity:read_all" not in (athlete.scope or "").split(","),
     )
 
 
