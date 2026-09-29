@@ -8,6 +8,15 @@ import { loadMapkit } from "@/lib/mapkit"
 // Everyone runs 30x real time so a Sunday long run fits into a minute
 const SPEED = 30
 const FRAME_MS = 40
+// Home turf: the map opens here unless the team's routes are somewhere else entirely
+const HOME = { north: 48.28162846561217, west: 11.472049612467698, south: 48.054257854159516, east: 11.730924273482833 }
+
+function centre(paths: [number, number][][]): [number, number] {
+  const points = paths.flat()
+  const lats = points.map(([lat]) => lat)
+  const lngs = points.map(([, lng]) => lng)
+  return [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2]
+}
 
 function legLengths(path: [number, number][]): number[] {
   const lengths = [0]
@@ -85,7 +94,12 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
             ),
         )
         map.addOverlays(heat)
-        map.showItems(heat, { animate: false, padding: new mapkit.Padding(32, 32, 32, 32) })
+        const [lat, lng] = centre(data.heat)
+        if (lat <= HOME.north && lat >= HOME.south && lng >= HOME.west && lng <= HOME.east) {
+          map.region = new mapkit.BoundingRegion(HOME.north, HOME.east, HOME.south, HOME.west).toCoordinateRegion()
+        } else {
+          map.showItems(heat, { animate: false, padding: new mapkit.Padding(32, 32, 32, 32) })
+        }
 
         // Runs done together share a group, so they keep the same clock and stay side by side
         const groupDuration = new Map<number, number>()
