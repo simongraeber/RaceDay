@@ -28,7 +28,7 @@ Evaluated against the current Strava API v3 docs.
 | Route geometry for the map | **Yes** — `map.summary_polyline` on each activity, or `GET /activities/{id}/streams` for `latlng`. |
 | Splits, pace, HR, elevation | **Yes** — `DetailedActivity`, `splits_metric`, streams. |
 | Stay fresh automatically | **Yes** — webhooks on activity create/update. |
-| Strava's race-time predictions | **No.** The race predictor and fitness/freshness are Summit web features with no API. We compute our own (Riegel on recent runs + best efforts). |
+| Strava's race-time predictions | **No.** The race predictor and fitness/freshness are Summit web features with no API. We compute our own (damped Riegel on recent runs + best efforts). |
 | Activity GPX export | **No** (only routes have `export_gpx`). Streams (`latlng`, `altitude`, `distance`, `time`) carry the same data. |
 | Other useful data | Best efforts per distance (400 m … marathon, with PR rank), km splits, laps, kudos/comment/PR counts, gear mileage, athlete YTD totals, segment efforts. |
 
@@ -115,7 +115,17 @@ Open team link
 
 Two layers, kept deliberately simple:
 
-1. **Deterministic baseline** — Riegel formula on the athlete's best recent efforts, adjusted by weekly volume trend and long-run distance. This is the number shown.
+1. **Deterministic baseline** — Riegel on the athlete's efforts of the last 12 weeks (whole runs plus Strava best efforts,
+   5 km + and at most 4× extrapolation). Plain Riegel with `b = 1.06` is fitted to races at similar distances and is
+   famously optimistic when projecting far, and it assumes race-specific endurance training — so we damp it:
+   - the exponent grows with the extrapolation factor (`1.06 + 0.03 · log₂(ratio)`, capped at `1.15`),
+   - up to +12 % when the longest run and weekly volume fall short of the race (target: longest run ≥ 80 % of the race
+     distance, weekly volume ≥ 2× the race distance),
+   - up to +5 % for efforts older than four weeks,
+   - the shown time is the **median of the three best** projections, so one lucky downhill run cannot set the goal.
+
+   A half marathon projected from a hard 6 km therefore lands ~7–11 % slower than plain Riegel, while a recent 16 km
+   long run barely moves. This is the number shown.
 2. **LLM layer** — gets the computed stats as structured input and produces the *explanation*, the tone, and the motivation ("you need three more long runs to hold sub-1:50"). It never invents the time.
 
 This keeps predictions defensible and cheap, and keeps the LLM doing what it's good at.

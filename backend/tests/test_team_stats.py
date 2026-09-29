@@ -26,17 +26,35 @@ class TeamStatsTests(unittest.TestCase):
         self.assertEqual(pace_seconds_km(5000, 1500), 300)
         self.assertIsNone(pace_seconds_km(900, 250))
 
-    def test_projection_from_qualifying_effort(self):
-        self.assertEqual(predict_finish([(10000, 3000)], 21097), 6619)
+    def test_projection_damps_long_extrapolations(self):
+        # 10 km in 50:00 with a matching endurance base: slower than plain Riegel's 1:50:19
+        fit = predict_finish([(10000, 3000, 0)], 21097, weekly_km=45, longest_run_m=18000)
+        self.assertEqual(fit, 6781)
+        # Same speed, but the longest run is 8 km and volume is low
+        untrained = predict_finish([(10000, 3000, 0)], 21097, weekly_km=15, longest_run_m=8000)
+        self.assertGreater(untrained, fit * 1.05)
         self.assertIsNone(predict_finish([], 21097))
-        self.assertIsNone(predict_finish([(2000, 500)], 21097))
+        self.assertIsNone(predict_finish([(2000, 500, 0)], 21097))
+
+    def test_old_efforts_count_less(self):
+        fresh = predict_finish([(10000, 3000, 7)], 21097, weekly_km=45, longest_run_m=18000)
+        old = predict_finish([(10000, 3000, 80)], 21097, weekly_km=45, longest_run_m=18000)
+        self.assertGreater(old, fresh)
+
+    def test_single_lucky_effort_does_not_set_the_time(self):
+        efforts = [(10000, 2400, 0), (10000, 3000, 0), (10000, 3060, 0)]
+        self.assertEqual(
+            predict_finish(efforts, 21097, weekly_km=45, longest_run_m=18000),
+            predict_finish([(10000, 3000, 0)], 21097, weekly_km=45, longest_run_m=18000),
+        )
 
     def test_race_efforts_include_best_efforts_and_skip_old_runs(self):
         efforts = race_efforts(
             [run(12000, 3900, 1, [{"distance": 10000, "elapsed_time": 3000}]), run(10000, 2000, 120)],
-            NOW - timedelta(days=84),
+            NOW,
         )
-        self.assertEqual(efforts, [(12000, 3900), (10000, 3000)])
+        self.assertEqual([(m, s) for m, s, _ in efforts], [(12000, 3900), (10000, 3000)])
+        self.assertEqual([round(age) for *_, age in efforts], [1, 1])
 
     def test_rolling_seven_day_cards(self):
         runs = {
