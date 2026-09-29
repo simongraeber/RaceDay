@@ -20,6 +20,14 @@ def image_bytes(format: str = "PNG") -> bytes:
     return output.getvalue()
 
 
+def transparent_avatar() -> bytes:
+    image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    image.paste((232, 93, 42, 255), (16, 12, 48, 56))
+    output = BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
 class AvatarTests(unittest.TestCase):
     def test_avatar_writes_require_site_origin(self):
         def request(origin: str) -> Request:
@@ -46,12 +54,26 @@ class AvatarTests(unittest.TestCase):
         with self.assertRaises(avatar.InvalidImage):
             avatar.normalize_image(b"not an image")
 
+    def test_generated_avatar_must_have_a_transparent_background(self):
+        with self.assertRaises(avatar.GenerationFailed):
+            avatar.to_avatar(image_bytes())
+        opaque = Image.new("RGBA", (64, 64), (232, 93, 42, 255))
+        for point in [(0, 0), (0, 63), (63, 0), (63, 63)]:
+            opaque.putpixel(point, (0, 0, 0, 0))
+        output = BytesIO()
+        opaque.save(output, format="PNG")
+        with self.assertRaises(avatar.GenerationFailed):
+            avatar.to_avatar(output.getvalue())
+        with Image.open(BytesIO(avatar.to_avatar(transparent_avatar()))) as image:
+            self.assertEqual(image.getpixel((0, 0))[3], 0)
+            self.assertEqual(image.getpixel((32, 32))[3], 255)
+
     def test_generation_sends_photo_and_style_as_separate_images(self):
         requests = []
 
         def respond(request: httpx.Request) -> httpx.Response:
             requests.append(request)
-            return httpx.Response(200, json={"data": [{"b64_json": base64.b64encode(image_bytes("JPEG")).decode()}]})
+            return httpx.Response(200, json={"data": [{"b64_json": base64.b64encode(transparent_avatar()).decode()}]})
 
         real_client = httpx.AsyncClient
 
@@ -61,13 +83,14 @@ class AvatarTests(unittest.TestCase):
         with patch.object(settings, "openai_api_key", "test-key"), patch.object(avatar.httpx, "AsyncClient", client):
             result = asyncio.run(avatar.generate_avatar(avatar.normalize_image(image_bytes()), "blue headband"))
 
-        self.assertTrue(result.startswith(b"\xff\xd8"))
+        self.assertTrue(result.startswith(b"\x89PNG"))
         body = requests[0].content
         self.assertEqual(body.count(b'name="image[]"'), 2)
         self.assertIn(b"runner.png", body)
         self.assertIn(b"style.png", body)
         self.assertIn(b"blue headband", body)
         self.assertIn(b"gpt-image-2.5-flare", body)
+        self.assertIn(b"transparent", body)
 
 
 if __name__ == "__main__":

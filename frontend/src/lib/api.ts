@@ -35,11 +35,29 @@ export interface MyTeam {
 export interface Member {
   name: string
   avatar_url: string | null
+  avatar_is_generated: boolean
   goal_seconds: number | null
   runs: number
   total_km: number
   last_4_weeks_km: number
   longest_km: number
+  week_km: number
+  week_runs: number
+  prediction_seconds: number | null
+  recent_runs: { date: string; distance_km: number; pace_seconds_km: number | null }[]
+}
+
+export interface Highlights {
+  week_start: string
+  week_km: number
+  week_time_s: number
+  week_runs: number
+  longest_run_km: number
+  longest_runner: string | null
+  fastest_pace_seconds_km: number | null
+  fastest_runner: string | null
+  most_runs: number
+  most_runs_runner: string | null
 }
 
 export interface Viewer {
@@ -55,6 +73,7 @@ export interface Team {
   race_date: string
   race_distance_m: number
   members: Member[]
+  highlights: Highlights
   viewer: Viewer | null
 }
 

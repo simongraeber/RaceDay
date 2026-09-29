@@ -217,5 +217,5 @@ Put the returned `id` into `STRAVA_WEBHOOK_SUBSCRIPTION_ID`.
 
 ## Status
 
-- Done: landing, imprint, privacy, Strava login, team create/join/overview, avatar generation, backfill, webhooks, placeholder team page.
-- Next: map, predictions, AI recaps, team posters, terms page.
+- Done: landing, imprint, privacy, Strava login, team create/join/overview, avatars, backfill, webhooks, live race-day countdown, weekly team highlights, recent runs and training-based finish estimates.
+- Next: route map, split-level fastest kilometre, AI recaps, team posters, terms page. Weekly comments currently use real stats and templates, not an LLM.
