@@ -5,13 +5,18 @@ from pathlib import Path
 
 import httpx
 from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 
 from app.config import settings
+
+register_heif_opener()
 
 log = logging.getLogger(__name__)
 REFERENCE_IMAGE = Path(__file__).resolve().parents[1] / "resources" / "CaracterReferenceImage.png"
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
-MAX_PIXELS = 16_000_000
+# iPhone main cameras shoot 24-48 MP
+MAX_PIXELS = 50_000_000
+FORMATS = {"PNG", "JPEG", "WEBP", "HEIF"}
 
 
 class InvalidImage(Exception):
@@ -25,8 +30,8 @@ class GenerationFailed(Exception):
 def normalize_image(raw: bytes) -> bytes:
     try:
         with Image.open(BytesIO(raw)) as image:
-            if image.format not in {"PNG", "JPEG", "WEBP"} or image.width * image.height > MAX_PIXELS:
-                raise InvalidImage("Use a PNG, JPEG or WebP image under 16 megapixels")
+            if image.format not in FORMATS or image.width * image.height > MAX_PIXELS:
+                raise InvalidImage("Use a PNG, JPEG, WebP or HEIC photo under 50 megapixels")
             image = ImageOps.exif_transpose(image).convert("RGB")
             image.thumbnail((1024, 1024))
             output = BytesIO()

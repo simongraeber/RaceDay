@@ -16,7 +16,12 @@ API_URL = "https://www.strava.com/api/v3"
 # activity:read (not read_all) excludes "Only Me" activities and privacy-zone data
 SCOPE = "read,activity:read"
 PER_PAGE = 200
+STREAM_KEYS = "latlng,altitude,distance,time"
 _TIMEOUT = 15.0
+_RATE_WINDOW_S = 15 * 60
+
+# Last seen read-rate usage: (seen_at, (15min_used, daily_used), (15min_limit, daily_limit))
+_read_rate: tuple[float, tuple[int, ...], tuple[int, ...]] | None = None
 
 
 class StravaError(Exception):
@@ -103,6 +108,29 @@ async def revoke(athlete: Athlete) -> None:
     _raise_for(resp)
 
 
+def _track_rate(resp: httpx.Response) -> None:
+    global _read_rate
+    usage = resp.headers.get("x-readratelimit-usage") or resp.headers.get("x-ratelimit-usage")
+    limit = resp.headers.get("x-readratelimit-limit") or resp.headers.get("x-ratelimit-limit")
+    try:
+        if usage and limit:
+            _read_rate = (
+                time.monotonic(),
+                tuple(int(v) for v in usage.split(",")),
+                tuple(int(v) for v in limit.split(",")),
+            )
+    except ValueError:
+        pass
+
+
+def read_budget_ok(share: float = 0.6) -> bool:
+    """True while background work may spend read requests without starving webhooks."""
+    if _read_rate is None or time.monotonic() - _read_rate[0] > _RATE_WINDOW_S:
+        return True
+    _, used, limits = _read_rate
+    return all(u < lim * share for u, lim in zip(used, limits))
+
+
 async def _get(token: str, path: str, params: dict | None = None) -> dict | list | None:
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(
@@ -110,6 +138,7 @@ async def _get(token: str, path: str, params: dict | None = None) -> dict | list
             params=params,
             headers={"Authorization": f"Bearer {token}"},
         )
+    _track_rate(resp)
     if resp.status_code == 404:
         return None
     _raise_for(resp)
@@ -129,3 +158,9 @@ async def list_activities(token: str, after: int, page: int) -> list[dict]:
 
 async def get_activity(token: str, activity_id: int) -> dict | None:
     return await _get(token, f"/activities/{activity_id}")  # type: ignore[return-value]
+
+
+async def get_activity_streams(token: str, activity_id: int) -> dict | None:
+    return await _get(  # type: ignore[return-value]
+        token, f"/activities/{activity_id}/streams", {"keys": STREAM_KEYS, "key_by_type": "true"}
+    )

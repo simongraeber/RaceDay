@@ -19,7 +19,7 @@ from app.security import (
     create_session_token,
     read_oauth_state,
 )
-from app.services import strava, sync
+from app.services import strava, sync, team_cache
 
 log = logging.getLogger(__name__)
 
@@ -110,6 +110,7 @@ async def strava_callback(
                 db.add(Membership(team_id=team.id, athlete_id=athlete.id))
             target = f"/t/{team.id}?joined=1"
     await db.commit()
+    team_cache.clear()
 
     if athlete.last_synced_at is None:
         background.add_task(sync.backfill, athlete.id)
@@ -170,4 +171,5 @@ async def delete_account(
         log.warning("Strava revoke failed for athlete %s", athlete.id, exc_info=True)
     await db.delete(athlete)
     await db.commit()
+    team_cache.clear()
     response.delete_cookie(SESSION_COOKIE, path="/")

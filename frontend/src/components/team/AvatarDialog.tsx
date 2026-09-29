@@ -1,8 +1,12 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react"
 import * as Dialog from "@radix-ui/react-dialog"
 import { ImagePlus, Loader2, Trash2, WandSparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { api, ApiError } from "@/lib/api"
+import { prepareUpload } from "@/lib/image"
+
+const MAX_BYTES = 5 * 1024 * 1024
+const ACCEPT = "image/png,image/jpeg,image/webp,image/heic,image/heif,.heic,.heif"
 
 interface Props {
   open: boolean
@@ -14,12 +18,15 @@ interface Props {
 export default function AvatarDialog({ open, onOpenChange, hasAvatar, onChange }: Props) {
   const [photo, setPhoto] = useState<File | null>(null)
   const [preview, setPreview] = useState("")
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const [preparing, setPreparing] = useState(false)
   const [description, setDescription] = useState("")
   const [consent, setConsent] = useState(false)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
+    setPreviewFailed(false)
     if (!photo) {
       setPreview("")
       return
@@ -28,6 +35,17 @@ export default function AvatarDialog({ open, onOpenChange, hasAvatar, onChange }
     setPreview(url)
     return () => URL.revokeObjectURL(url)
   }, [photo])
+
+  async function choose(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0]
+    if (!selected) return
+    setPreparing(true)
+    setError("")
+    const prepared = await prepareUpload(selected)
+    setPhoto(prepared)
+    setError(prepared.size > MAX_BYTES ? "Choose a photo under 5 MB." : "")
+    setPreparing(false)
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -47,7 +65,7 @@ export default function AvatarDialog({ open, onOpenChange, hasAvatar, onChange }
         : code === 503 ? "Avatar generation is not configured yet."
         : code === 429 ? "Please wait five minutes before trying again."
         : code === 413 ? "Choose a photo under 5 MB."
-        : code === 422 ? "Please choose a valid PNG, JPEG or WebP photo."
+        : code === 422 ? "Please choose a valid PNG, JPEG, WebP or HEIC photo."
         : "Could not generate your avatar. Please try again.")
     } finally {
       setWorking(false)
@@ -89,13 +107,16 @@ export default function AvatarDialog({ open, onOpenChange, hasAvatar, onChange }
               <div>
                 <p className="mb-2 text-sm font-medium">Your photo</p>
                 <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-md border border-dashed border-border bg-muted text-sm text-muted-foreground hover:border-primary">
-                  {preview ? <img src={preview} alt="Your chosen photo" className="h-full w-full object-cover" /> : <><ImagePlus className="size-7" /> Choose photo</>}
-                  <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
-                    const selected = event.target.files?.[0] ?? null
-                    setPhoto(selected)
-                    setPreview("")
-                    setError(selected && selected.size > 5 * 1024 * 1024 ? "Choose a photo under 5 MB." : "")
-                  }} />
+                  {preparing ? (
+                    <><Loader2 className="size-7 animate-spin" /> Preparing photo…</>
+                  ) : preview && !previewFailed ? (
+                    <img src={preview} alt="Your chosen photo" className="h-full w-full object-cover" onError={() => setPreviewFailed(true)} />
+                  ) : photo ? (
+                    <><ImagePlus className="size-7" /> Photo selected</>
+                  ) : (
+                    <><ImagePlus className="size-7" /> Choose photo</>
+                  )}
+                  <input className="sr-only" type="file" accept={ACCEPT} onChange={choose} />
                 </label>
               </div>
               <div>
@@ -128,7 +149,7 @@ export default function AvatarDialog({ open, onOpenChange, hasAvatar, onChange }
                   <Trash2 /> Remove avatar
                 </Button>
               ) : <span />}
-              <Button type="submit" disabled={!photo || photo.size > 5 * 1024 * 1024 || !consent || working}>
+              <Button type="submit" disabled={!photo || photo.size > MAX_BYTES || !consent || working || preparing}>
                 {working ? <Loader2 className="animate-spin" /> : <WandSparkles />}
                 {working ? "Creating avatar…" : "Generate avatar"}
               </Button>

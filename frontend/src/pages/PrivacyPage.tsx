@@ -42,13 +42,15 @@ export default function PrivacyPage() {
           <li>Your Strava athlete ID, first name, last name, and profile picture URL</li>
           <li>
             Your runs from the last 12 months that are visible to Everyone or Followers: date,
-            distance, duration, elevation, and a simplified route
+            distance, duration, elevation, kilometre splits, best efforts, kudos count, and the
+            GPS track (downsampled)
           </li>
           <li>Access tokens, stored encrypted, so we can receive new runs automatically</li>
         </ul>
         <p>
-          We never read activities set to "Only Me" or your Strava privacy zones. We additionally
-          remove the first and last 200 metres of every route before storing it.
+          We never read activities set to "Only Me" or your Strava privacy zones, and we never store
+          heart-rate data. We additionally remove the first and last 200 metres of every route and
+          GPS track before storing it.
         </p>
 
         <h2>5. Optional AI avatar</h2>
@@ -60,34 +62,42 @@ export default function PrivacyPage() {
           upload someone else's photo without their permission.
         </p>
 
-        <h2>6. Who can see your data</h2>
+        <h2>6. AI coach comments</h2>
+        <p>
+          Team pages show short, humorous comments about recent training. To write them, we send
+          OpenAI aggregated training numbers (for example weekly distance, run count and predicted
+          finish time) under anonymous labels such as “R1”. Names, photos, routes and Strava IDs are
+          not sent.
+        </p>
+
+        <h2>7. Who can see your data</h2>
         <p>
           Your first name, last initial, profile picture or generated avatar, run statistics, and routes are{" "}
           <strong>visible to anyone who has the link to your team</strong>. Team links are not listed
           or searchable. You can hide yourself from a team at any time.
         </p>
 
-        <h2>7. Cookies</h2>
+        <h2>8. Cookies</h2>
         <p>
           We use two strictly necessary cookies: a short-lived one to secure the Strava login, and a
           session cookie that keeps you logged in for up to 30 days.
         </p>
 
-        <h2>8. Legal basis and retention</h2>
+        <h2>9. Legal basis and retention</h2>
         <p>
           Processing is based on your consent (Art. 6(1)(a) GDPR), given when you connect Strava. We
           keep your data until you delete your account or revoke RaceDay's access in your Strava
           settings, after which it is deleted.
         </p>
 
-        <h2>9. Your rights</h2>
+        <h2>10. Your rights</h2>
         <p>
           You have the right to access, rectify, or delete your data, to restrict or object to its
           processing, to data portability, and to withdraw consent at any time. You also have the
           right to lodge a complaint with a supervisory authority. Contact us at {EMAIL}.
         </p>
 
-        <h2>10. Changes</h2>
+        <h2>11. Changes</h2>
         <p>We may update this policy. The current version is always published here.</p>
       </div>
 

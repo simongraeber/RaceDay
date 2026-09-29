@@ -37,13 +37,11 @@ export interface Member {
   avatar_url: string | null
   avatar_is_generated: boolean
   goal_seconds: number | null
-  runs: number
-  total_km: number
-  last_4_weeks_km: number
-  longest_km: number
   week_km: number
   week_runs: number
+  last_4_weeks_km: number
   prediction_seconds: number | null
+  best_km_seconds: number | null
   recent_runs: { date: string; distance_km: number; pace_seconds_km: number | null }[]
 }
 
@@ -52,12 +50,22 @@ export interface Highlights {
   week_km: number
   week_time_s: number
   week_runs: number
+  week_elevation_m: number
+  week_kudos: number
   longest_run_km: number
   longest_runner: string | null
+  fastest_km_seconds: number | null
+  fastest_km_runner: string | null
   fastest_pace_seconds_km: number | null
   fastest_runner: string | null
   most_runs: number
   most_runs_runner: string | null
+}
+
+export interface Coach {
+  source: "ai" | "coach"
+  generated_at: string | null
+  notes: { name: string; text: string }[]
 }
 
 export interface Viewer {
@@ -74,6 +82,7 @@ export interface Team {
   race_distance_m: number
   members: Member[]
   highlights: Highlights
+  coach: Coach
   viewer: Viewer | null
 }
 

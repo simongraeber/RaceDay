@@ -13,7 +13,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -101,3 +101,31 @@ class Activity(Base):
     elevation_gain_m: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     # Start/end trimmed so home locations are never exposed
     summary_polyline: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ActivityDetail(Base):
+    """Detailed Strava data fetched lazily in the background; empty when Strava refused it."""
+
+    __tablename__ = "activity_details"
+
+    activity_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("activities.id", ondelete="CASCADE"), primary_key=True
+    )
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    best_efforts: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    splits: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    kudos_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    pr_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Trimmed + downsampled latlng/altitude/distance/time; heart rate is never stored
+    streams: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+
+class TeamCoachNote(Base):
+    __tablename__ = "team_coach_notes"
+
+    team_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True
+    )
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # [{"athlete_id": int, "text": str}]
+    notes: Mapped[list] = mapped_column(JSONB, nullable=False)
