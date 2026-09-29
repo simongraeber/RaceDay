@@ -27,6 +27,11 @@ Example: "R1 seems to think they are the Flash and don't need to train."
 Data: *_km are kilometres, *_s are seconds (lower finish time = faster), null means unknown.
 Rules:
 - Refer to runners only by their id (R1, R2, ...). Use "they" or the id, never gendered pronouns.
+- Give each runner one short roast with a specific focus; vary the focus across runners and refreshes.
+- Pick from the available evidence: last run distance or pace, average weekly pace, fastest kilometre,
+    weekly or monthly volume, consistency or rest, longest run, or race prediction vs goal.
+- Do not default to distance or mileage. Do not repeat the same angle for every runner, and never
+    invent missing stats. If a value is null, pick another angle.
 - Only mock training behaviour: volume, consistency, rest days, pace, predicted time vs goal.
 - Never mention body, weight, looks, health, injuries, age, gender, or anything not in the data.
 - No profanity, slurs or threats. Write in English."""
@@ -78,7 +83,9 @@ def coach_view(view: TeamView, note: TeamCoachNote | None) -> CoachOut:
     def render(text: str) -> str:
         return re.sub(r"\{athlete:(\d+)\}", lambda m: names.get(int(m[1]), "someone"), text)
 
-    if note:
+    if note and {athlete_id for athlete_id, _ in view.members} <= {
+        entry["athlete_id"] for entry in note.notes
+    }:
         ai_notes = [
             CoachNoteOut(name=names[n["athlete_id"]], text=render(n["text"]))
             for n in note.notes
@@ -94,7 +101,9 @@ def should_refresh(team_id: uuid.UUID, view: TeamView, note: TeamCoachNote | Non
         return False
     if time.monotonic() - _last_attempt.get(team_id, -RETRY_AFTER_S) < RETRY_AFTER_S:
         return False
-    return note is None or note.generated_at < datetime.now(timezone.utc) - REFRESH_AFTER
+    covered = {entry["athlete_id"] for entry in note.notes} if note else set()
+    missing_members = bool(note and note.notes) and not {athlete_id for athlete_id, _ in view.members} <= covered
+    return missing_members or note is None or note.generated_at < datetime.now(timezone.utc) - REFRESH_AFTER
 
 
 def _output_text(data: dict) -> str:

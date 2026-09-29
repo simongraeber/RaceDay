@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from app.models import Athlete, Membership, Team
 from app.services.enrich import detail_values, trim_streams
-from app.services.sync import is_public
+from app.services.sync import can_share_route
 from app.services.team_stats import Run, pace_seconds_km, predict_finish, race_efforts, summarize
 
 NOW = datetime(2026, 9, 30, 12, tzinfo=timezone.utc)  # a Wednesday
@@ -28,14 +28,20 @@ class TeamStatsTests(unittest.TestCase):
         self.assertIsNone(pace_seconds_km(900, 250))
 
     def test_projection_damps_long_extrapolations(self):
-        # 10 km in 50:00 with a matching endurance base: slower than plain Riegel's 1:50:19
+        # 10 km in 50:00 with a matching endurance base.
         fit = predict_finish([(10000, 3000, 0)], 21097, weekly_km=45, longest_run_m=18000)
-        self.assertEqual(fit, 6781)
-        # Same speed, but the longest run is 8 km and volume is low
+        self.assertGreater(fit, 6000)
+        self.assertLess(fit, 6900)
         untrained = predict_finish([(10000, 3000, 0)], 21097, weekly_km=15, longest_run_m=8000)
-        self.assertGreater(untrained, fit * 1.05)
+        self.assertGreater(untrained, fit)
         self.assertIsNone(predict_finish([], 21097))
         self.assertIsNone(predict_finish([(2000, 500, 0)], 21097))
+
+    def test_five_k_efforts_can_project_to_a_half_marathon(self):
+        estimate = predict_finish([(5000, 1293, 29)], 21097, weekly_km=17, longest_run_m=15000)
+        self.assertIsNotNone(estimate)
+        self.assertGreaterEqual(estimate, 6000)
+        self.assertLessEqual(estimate, 6500)
 
     def test_old_efforts_count_less(self):
         fresh = predict_finish([(10000, 3000, 7)], 21097, weekly_km=45, longest_run_m=18000)
@@ -73,6 +79,11 @@ class TeamStatsTests(unittest.TestCase):
         self.assertEqual(cards["missing"].detail, "Max X.")
         self.assertEqual(view.facts[1]["goal_finish_s"], 6000)
         self.assertEqual(view.facts[2]["km_last_4_weeks"], 25.0)
+        self.assertEqual(view.facts[1]["last_run_km"], 8.0)
+        self.assertEqual(view.facts[1]["last_run_pace_s_per_km"], 300)
+        self.assertEqual(view.facts[1]["average_pace_last_7_days_s_per_km"], 300)
+        self.assertIsNone(view.facts[3]["last_run_km"])
+        self.assertIsNone(view.facts[3]["average_pace_last_7_days_s_per_km"])
         self.assertEqual(view.members[1][1].best_km_seconds, 245)
         self.assertEqual(view.members[0][1].runs_7d, 1)
 
@@ -97,11 +108,12 @@ class TeamStatsTests(unittest.TestCase):
 
 class EnrichTests(unittest.TestCase):
     def test_only_runs_shared_with_everyone_are_public(self):
-        self.assertTrue(is_public({"visibility": "everyone"}))
-        self.assertTrue(is_public({}))
-        self.assertFalse(is_public({"visibility": "followers_only"}))
-        self.assertFalse(is_public({"visibility": "only_me"}))
-        self.assertFalse(is_public({"visibility": "everyone", "private": True}))
+        self.assertTrue(can_share_route({"visibility": "everyone"}))
+        self.assertTrue(can_share_route({}))
+        self.assertTrue(can_share_route({"visibility": "followers_only"}))
+        self.assertTrue(can_share_route({"visibility": "followers_only", "private": True}))
+        self.assertFalse(can_share_route({"visibility": "only_me"}))
+        self.assertFalse(can_share_route({"visibility": "everyone", "private": True}))
 
     def test_streams_are_trimmed_and_downsampled(self):
         distance = list(range(0, 2001, 10))

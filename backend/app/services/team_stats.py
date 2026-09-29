@@ -17,13 +17,14 @@ HISTORY_WINDOW = timedelta(days=365)
 # Riegel's 1.06 was fitted to races at similar distances; it is famously optimistic when
 # extrapolating far, so the exponent grows with the extrapolation factor.
 RIEGEL_EXPONENT = 1.06
-RIEGEL_MAX_EXPONENT = 1.15
-RIEGEL_FADE_PER_DOUBLING = 0.03
+RIEGEL_MAX_EXPONENT = 1.08
+RIEGEL_FADE_PER_DOUBLING = 0.005
 # Riegel also assumes race-specific endurance training: a fast 10 km says little about a
 # half marathon if the longest run is 8 km.
 LONG_RUN_TARGET = 0.8  # of the race distance
 WEEKLY_KM_PER_RACE_KM = 2.0
-MAX_ENDURANCE_PENALTY = 0.12
+MAX_ENDURANCE_PENALTY = 0.06
+MAX_EXTRAPOLATION_RATIO = 5
 FRESH_DAYS = 28
 STALE_PENALTY_PER_WEEK = 0.004
 MAX_STALE_PENALTY = 0.05
@@ -95,7 +96,7 @@ def predict_finish(
         if seconds > 0
         and meters >= min(5000, distance_m / 3)
         and meters <= distance_m * 1.5
-        and distance_m / meters <= 4
+        and distance_m / meters <= MAX_EXTRAPOLATION_RATIO
     ]
     if not candidates:
         return None
@@ -241,6 +242,9 @@ def summarize(
             if race_ahead
             else None
         )
+        last_run = runs[0] if runs else None
+        recent_distance_m = sum(r.distance_m for r in recent)
+        recent_moving_time_s = sum(r.moving_time_s for r in recent)
         member = MemberOut(
             name=athlete.display_name,
             avatar_url=f"/api/v1/teams/{team.id}/avatars/{avatar_id}" if avatar_id else athlete.avatar_url,
@@ -267,6 +271,9 @@ def summarize(
             "km_last_4_weeks": member.last_4_weeks_km,
             "longest_run_last_12_weeks_km": round(longest_run_m / 1000, 1),
             "days_since_last_run": (now - runs[0].start).days if runs else None,
+            "last_run_km": round(last_run.distance_m / 1000, 1) if last_run else None,
+            "last_run_pace_s_per_km": pace_seconds_km(last_run.distance_m, last_run.moving_time_s) if last_run else None,
+            "average_pace_last_7_days_s_per_km": pace_seconds_km(recent_distance_m, recent_moving_time_s),
             "predicted_finish_s": prediction,
             "goal_finish_s": membership.goal_seconds,
             "best_1km_last_12_weeks_s": member.best_km_seconds,

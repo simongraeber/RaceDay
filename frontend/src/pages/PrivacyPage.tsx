@@ -43,7 +43,8 @@ export default function PrivacyPage() {
           <li>
             Your runs from the last 12 months — including those you share only with followers or keep
             private on Strava: date, distance, duration, elevation, kilometre splits, best efforts and
-            kudos count. The GPS track is stored only for runs you share with everyone.
+            kudos count. GPS tracks are stored for runs shared with followers or everyone; tracks for
+            runs set to Only You are never stored.
           </li>
           <li>Access tokens, stored encrypted, so we can receive new runs automatically</li>
         </ul>
@@ -63,10 +64,11 @@ export default function PrivacyPage() {
         </p>
         <p>
           If you have an avatar, we also send it to OpenAI to draw a few playful variations of your
-          character for the highlight cards (for example sweating after the longest run) and once more to
-          draw it as separate body parts, which lets your character run across the training map. Each of
-          these is generated once, stored with your avatar and removed together with it. No training data,
-          names or photos are sent with it.
+          character for the highlight cards and to draw it as separate body parts, which lets your
+          character run across the training map. Team-wide highlight images combine visible members'
+          generated avatars; cards featuring one runner use only that runner's avatar. Highlight images
+          are regenerated when the visible roster, avatar, or featured runner changes. No training data,
+          names or original photos are sent with the image request.
         </p>
 
         <h2>6. AI coach comments</h2>

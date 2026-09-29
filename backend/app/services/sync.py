@@ -19,9 +19,11 @@ BACKFILL_DAYS = 365
 TRIM_METERS = 400
 
 
-def is_public(data: dict) -> bool:
-    """True only for runs the athlete shares with everyone on Strava."""
-    return not data.get("private") and data.get("visibility", "everyone") == "everyone"
+def can_share_route(data: dict) -> bool:
+    """Share routes except for activities kept private (Only You) on Strava."""
+    return data.get("visibility", "everyone") in {"everyone", "followers_only"} and (
+        not data.get("private") or data.get("visibility") == "followers_only"
+    )
 
 
 def _haversine(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -67,7 +69,7 @@ async def upsert_activity(db: AsyncSession, athlete_id: int, activity_id: int, d
         "moving_time_s": data.get("moving_time") or 0,
         "elapsed_time_s": data.get("elapsed_time") or 0,
         "elevation_gain_m": data.get("total_elevation_gain") or 0,
-        "summary_polyline": trim_polyline((data.get("map") or {}).get("summary_polyline")) if is_public(data) else None,
+        "summary_polyline": trim_polyline((data.get("map") or {}).get("summary_polyline")) if can_share_route(data) else None,
     }
     stmt = insert(Activity).values(**values)
     await db.execute(

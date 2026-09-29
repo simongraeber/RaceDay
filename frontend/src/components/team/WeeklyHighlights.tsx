@@ -50,7 +50,7 @@ export default function WeeklyHighlights({ highlights, teamName }: { highlights:
       label: `Together, last ${highlights.window_days} days`,
       value: `${highlights.total_km.toFixed(1)} km`,
       detail: `${highlights.total_runs} runs logged`,
-      image_url: null,
+      image_url: highlights.together_image_url,
     },
     ...cards.map((c) => ({ ...c, icon: ICONS[c.icon] ?? Activity })),
   ]

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_athlete, get_optional_athlete
 from app.database import get_db
-from app.models import Athlete, Avatar, CardImage, Membership, Team, TeamCoachNote
+from app.models import Athlete, Avatar, CardImage, Membership, Team, TeamCardImage, TeamCoachNote
 from app.schemas.teams import MembershipUpdate, MyTeamOut, TeamCreate, TeamCreated, TeamOut, ViewerOut
 from app.services import card_art, coach, rig, team_cache
 from app.services.team_stats import load_team_view
@@ -85,6 +85,10 @@ async def get_team(
         background.add_task(coach.refresh, team.id)
     if card_art.should_refresh(team.id, view):
         background.add_task(card_art.refresh, team.id)
+    card_subjects = card_art.team_card_subjects(view)
+    image_urls, signature, ready = await card_art.group_art_status(db, team.id, card_subjects)
+    if card_art.should_refresh_group(team.id, signature, ready, image_urls, card_subjects):
+        background.add_task(card_art.refresh_group, team.id, card_subjects)
     if rig.should_backfill(team.id):
         background.add_task(rig.backfill, team.id)
 
@@ -100,7 +104,21 @@ async def get_team(
         race_date=team.race_date,
         race_distance_m=team.race_distance_m,
         members=[member for _, member in view.members],
-        highlights=view.highlights,
+        highlights=view.highlights.model_copy(
+            update={
+                "together_image_url": image_urls.get("together"),
+                "cards": [
+                    card.model_copy(
+                        update={
+                            "image_url": image_urls.get(card.key)
+                            if card.key in card_art.GROUP_PROMPTS or card.key in card_art.SOLO_PROMPTS
+                            else card.image_url
+                        }
+                    )
+                    for card in view.highlights.cards
+                ],
+            }
+        ),
         coach=coach.coach_view(view, note),
         viewer=viewer_out,
     )
@@ -141,4 +159,18 @@ async def card_image(team_id: uuid.UUID, image_id: uuid.UUID, db: AsyncSession =
     )
     if image is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    return Response(image, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/{team_id}/group-art/{image_id}")
+async def group_art_image(team_id: uuid.UUID, image_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    team = await _get_team(db, team_id)
+    view = await load_team_view(db, team)
+    subjects = card_art.team_card_subjects(view)
+    urls, _, _ = await card_art.group_art_status(db, team_id, subjects)
+    image = await db.scalar(
+        select(TeamCardImage.image).where(TeamCardImage.team_id == team_id, TeamCardImage.id == image_id)
+    )
+    if image is None or not any(url.endswith(str(image_id)) for url in urls.values()):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team artwork not found")
     return Response(image, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
