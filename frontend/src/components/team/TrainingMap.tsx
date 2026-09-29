@@ -29,7 +29,8 @@ function pointAt(path: [number, number][], lengths: number[], progress: number):
   const t = (target - lengths[i - 1]) / span
   const [lat1, lng1] = path[i - 1]
   const [lat2, lng2] = path[i]
-  return [lat1 + (lat2 - lat1) * t, lng1 + (lng2 - lng1) * t, lng2 < lng1]
+  // The character art faces west, so mirror it when the runner heads east
+  return [lat1 + (lat2 - lat1) * t, lng1 + (lng2 - lng1) * t, lng2 > lng1]
 }
 
 export default function TrainingMap({ teamId }: { teamId: string }) {
@@ -97,7 +98,7 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
           const annotation = new mapkit.Annotation(
             new mapkit.Coordinate(track.path[0][0], track.path[0][1]),
             () => element,
-            { anchorOffset: new DOMPoint(seen * 18, -20) },
+            { anchorOffset: new DOMPoint(seen * 18, -32) },
           )
           return {
             track,
@@ -118,9 +119,9 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
           last = now
           for (const sprite of sprites) {
             const progress = ((now - start) % sprite.duration) / sprite.duration
-            const [lat, lng, left] = pointAt(sprite.track.path, sprite.lengths, progress)
+            const [lat, lng, mirrored] = pointAt(sprite.track.path, sprite.lengths, progress)
             sprite.annotation.coordinate = new mapkit.Coordinate(lat, lng)
-            sprite.element.firstElementChild?.classList.toggle("is-left", left)
+            sprite.element.firstElementChild?.classList.toggle("is-mirrored", mirrored)
           }
         }
         frame = requestAnimationFrame(step)

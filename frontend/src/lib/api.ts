@@ -81,6 +81,7 @@ export interface Track {
   name: string
   avatar_url: string | null
   avatar_is_generated: boolean
+  rig_url: string | null
   date: string
   distance_km: number
   duration_s: number

@@ -120,6 +120,21 @@ class ActivityDetail(Base):
     streams: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
+class AvatarRig(Base):
+    """The avatar redrawn as separate body parts; sliced by fixed boxes in the frontend rig."""
+
+    __tablename__ = "avatar_rigs"
+
+    athlete_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("athletes.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False
+    )
+    image: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class CardImage(Base):
     """AI artwork of a runner's avatar for one highlight card, generated once and reused."""
 

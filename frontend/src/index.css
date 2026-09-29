@@ -169,6 +169,7 @@ body {
   display: flex;
   gap: 0.75rem;
   overflow-x: auto;
+  touch-action: pan-x;
   padding-bottom: 0.5rem;
   scroll-snap-type: x mandatory;
   scrollbar-width: thin;
@@ -294,6 +295,8 @@ body {
   .runner-card:hover { transform: none; }
   .ai-shimmer-spin { animation: none; }
   .runner-sprite-body { animation: none; }
+  .rig-bob,
+  .rig-joint { animation: none; }
 }
 
 /* ── Training map ── */
@@ -330,7 +333,8 @@ body {
   transform-origin: 50% 90%;
   animation: sprite-run 520ms steps(1, end) infinite alternate;
 }
-.runner-sprite.is-left .runner-sprite-body { scale: -1 1; }
+.runner-sprite:has(.rig) .runner-sprite-body { animation: none; }
+.runner-sprite.is-mirrored .runner-sprite-body { scale: -1 1; }
 .runner-sprite-img {
   width: 100%;
   height: 100%;
@@ -393,6 +397,72 @@ body {
 @keyframes sprite-shadow {
   from { opacity: 0.3; width: 26px; }
   to { opacity: 0.16; width: 18px; }
+}
+
+/* ── Rigged character: parts cut from the generated sheet, one step per --rig-step ── */
+.rig {
+  --rig-step: 260ms;
+  position: relative;
+}
+.rig-root {
+  position: absolute;
+  left: 50%;
+  transform-origin: 0 0;
+}
+.rig-joint {
+  position: absolute;
+  will-change: transform;
+}
+.rig-part {
+  position: absolute;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 3px 4px rgba(20, 30, 25, 0.28));
+}
+.rig-upper { z-index: 2; }
+.rig-elbow,
+.rig-knee { z-index: 1; }
+.rig-arm--back { z-index: 10; }
+.rig-leg--back { z-index: 20; }
+.rig-torso { z-index: 30; }
+.rig-leg--front { z-index: 40; }
+.rig-arm--front { z-index: 50; }
+.rig-head { z-index: 60; }
+
+.rig-bob { animation: rig-bob calc(var(--rig-step) / 2) ease-in-out infinite alternate; }
+.rig-head { animation: rig-head calc(var(--rig-step) * 1.37) ease-in-out infinite alternate; }
+.rig-hip { animation: rig-thigh var(--rig-step) ease-in-out infinite alternate; }
+.rig-knee { animation: rig-knee var(--rig-step) ease-in-out infinite alternate; animation-delay: calc(var(--rig-step) * -0.3); }
+.rig-shoulder { animation: rig-shoulder var(--rig-step) ease-in-out infinite alternate; }
+.rig-elbow { animation: rig-elbow var(--rig-step) ease-in-out infinite alternate; animation-delay: calc(var(--rig-step) * -0.25); }
+/* Opposite limbs run half a stride behind */
+.rig-leg--back.rig-hip,
+.rig-leg--back .rig-knee,
+.rig-arm--front.rig-shoulder,
+.rig-arm--front .rig-elbow { animation-direction: alternate-reverse; }
+
+@keyframes rig-bob {
+  from { transform: translateY(6px) rotate(-5deg); }
+  to { transform: translateY(-34px) rotate(-11deg); }
+}
+@keyframes rig-head {
+  from { transform: rotate(-11deg) translateY(4px); }
+  to { transform: rotate(9deg) translateY(-12px); }
+}
+@keyframes rig-thigh {
+  from { transform: rotate(-42deg); }
+  to { transform: rotate(38deg); }
+}
+@keyframes rig-knee {
+  from { transform: rotate(-4deg); }
+  to { transform: rotate(-88deg); }
+}
+@keyframes rig-shoulder {
+  from { transform: rotate(48deg); }
+  to { transform: rotate(-40deg); }
+}
+@keyframes rig-elbow {
+  from { transform: rotate(-48deg); }
+  to { transform: rotate(-104deg); }
 }
 
 /* ── Apple AI Shimmer (same as SIU) ── */

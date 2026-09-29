@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import Activity, Athlete, Avatar, Membership, Team
+from app.models import Activity, Athlete, Avatar, AvatarRig, Membership, Team
 from app.schemas.maps import MapOut, TrackOut
 
 HISTORY = timedelta(days=365)
@@ -89,17 +89,20 @@ def build(team_id: uuid.UUID, rows: list[tuple], runs: list[_Run], now: datetime
     for run in runs:
         newest.setdefault(run.athlete_id, run)
 
-    names = {athlete.id: (athlete.display_name, avatar_id, athlete.avatar_url) for athlete, avatar_id in rows}
+    names = {
+        athlete.id: (athlete.display_name, avatar_id, rig_id, athlete.avatar_url) for athlete, avatar_id, rig_id in rows
+    }
     latest = sorted(newest.values(), key=lambda r: r.start, reverse=True)
     groups = group_runs(latest)
     tracks = []
     for index, run in enumerate(latest):
-        name, avatar_id, profile_url = names.get(run.athlete_id, ("Runner", None, None))
+        name, avatar_id, rig_id, profile_url = names.get(run.athlete_id, ("Runner", None, None, None))
         tracks.append(
             TrackOut(
                 name=name,
                 avatar_url=f"/api/v1/teams/{team_id}/avatars/{avatar_id}" if avatar_id else profile_url,
                 avatar_is_generated=avatar_id is not None,
+                rig_url=f"/api/v1/teams/{team_id}/rigs/{rig_id}" if rig_id else None,
                 date=run.start.date(),
                 distance_km=round(run.distance_m / 1000, 1),
                 duration_s=run.moving_time_s,
@@ -118,9 +121,10 @@ async def load(db: AsyncSession, team: Team) -> MapOut:
 
     rows = (
         await db.execute(
-            select(Athlete, Avatar.id)
+            select(Athlete, Avatar.id, AvatarRig.id)
             .join(Membership, Membership.athlete_id == Athlete.id)
             .outerjoin(Avatar, (Avatar.athlete_id == Athlete.id) & Avatar.image.is_not(None))
+            .outerjoin(AvatarRig, AvatarRig.athlete_id == Athlete.id)
             .where(Membership.team_id == team.id, Membership.visible.is_(True))
         )
     ).all()
@@ -129,7 +133,7 @@ async def load(db: AsyncSession, team: Team) -> MapOut:
     result = await db.execute(
         select(Activity.athlete_id, Activity.start_date, Activity.distance_m, Activity.moving_time_s, Activity.summary_polyline)
         .where(
-            Activity.athlete_id.in_([a.id for a, _ in rows]),
+            Activity.athlete_id.in_([a.id for a, _, _ in rows]),
             Activity.start_date >= now - HISTORY,
             Activity.summary_polyline.is_not(None),
         )

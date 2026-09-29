@@ -63,8 +63,9 @@ export default function PrivacyPage() {
         </p>
         <p>
           If you have an avatar, we also send it to OpenAI to draw a few playful variations of your
-          character for the highlight cards (for example sweating after the longest run). Each variation
-          is generated once, stored with your avatar and removed together with it. No training data,
+          character for the highlight cards (for example sweating after the longest run) and once more to
+          draw it as separate body parts, which lets your character run across the training map. Each of
+          these is generated once, stored with your avatar and removed together with it. No training data,
           names or photos are sent with it.
         </p>
 
