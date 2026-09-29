@@ -11,6 +11,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Athlete, Avatar, Membership
 from app.services import avatar as images
+from app.services import team_cache
 
 router = APIRouter(tags=["avatars"])
 
@@ -69,6 +70,7 @@ async def create_avatar(
     avatar.created_at = datetime.now(timezone.utc)
     db.add(avatar)
     await db.commit()
+    team_cache.clear()
     return AvatarOut(url="/api/v1/avatars/me")
 
 
@@ -88,6 +90,7 @@ async def delete_avatar(request: Request, athlete: Athlete = Depends(get_current
     if avatar:
         avatar.image = None
         await db.commit()
+        team_cache.clear()
 
 
 @router.get("/teams/{team_id}/avatars/{avatar_id}")

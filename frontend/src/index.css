@@ -193,6 +193,20 @@ body {
   transition: box-shadow 200ms ease, transform 200ms ease;
 }
 .runner-card:hover { box-shadow: 0 8px 28px rgba(25, 45, 40, 0.12); transform: translateY(-3px); }
+
+.coach-card {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: linear-gradient(120deg, #2a2320 0%, #3b2a2f 55%, #2c2a3d 100%);
+  color: #f7efe9;
+}
+.coach-note {
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--primary);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
 .runner-card--0 { background: linear-gradient(135deg, #e5f1e8 0%, #e7ead9 62%, #d2e5db 100%); }
 .runner-card--1 { background: linear-gradient(135deg, #f9e8d9 0%, #ffdcc7 66%, #edd8d6 100%); }
 .runner-card--2 { background: linear-gradient(135deg, #f6e5ec 0%, #e9e3f0 62%, #f4d4dd 100%); }

@@ -28,6 +28,9 @@ Evaluated against the current Strava API v3 docs.
 | Route geometry for the map | **Yes** — `map.summary_polyline` on each activity, or `GET /activities/{id}/streams` for `latlng`. |
 | Splits, pace, HR, elevation | **Yes** — `DetailedActivity`, `splits_metric`, streams. |
 | Stay fresh automatically | **Yes** — webhooks on activity create/update. |
+| Strava's race-time predictions | **No.** The race predictor and fitness/freshness are Summit web features with no API. We compute our own (Riegel on recent runs + best efforts). |
+| Activity GPX export | **No** (only routes have `export_gpx`). Streams (`latlng`, `altitude`, `distance`, `time`) carry the same data. |
+| Other useful data | Best efforts per distance (400 m … marathon, with PR rank), km splits, laps, kudos/comment/PR counts, gear mileage, athlete YTD totals, segment efforts. |
 
 **Consequence for the architecture:** there is no group endpoint. Every team member authorizes RaceDay individually via OAuth; the backend stores their refresh token and aggregates the team view itself. A team is our own entity, not a Strava club.
 
@@ -155,9 +158,13 @@ Athlete (strava_id, name, avatar, scope, refresh_token_enc, access_token_enc, ex
   └── Avatar (athlete_id, uuid, generated_image)  -- optional, original photo discarded
   └── Activity (athlete_id, strava_id, start_date, distance, moving_time,
                 elevation, summary_polyline)  -- start/end trimmed
-Prediction (athlete_id, team_id, predicted_seconds, confidence, computed_at)
-Recap (team_id, week, payload_json, image_url)
+        └── ActivityDetail (best_efforts, splits, kudos, pr_count, streams)  -- trimmed, no heart rate
+TeamCoachNote (team_id, generated_at, notes)  -- AI roasts, refreshed ≤ every 12 h
 ```
+
+**Data flow.** Page views never call Strava. Summaries arrive via backfill + webhooks; a background worker
+then fetches details and GPS streams newest-first and pauses at 60 % of the read rate limit. Team pages are
+served from Postgres through a 2-minute in-process cache that is cleared on every write.
 
 Teams are not publicly listed. The authenticated `/teams/mine` endpoint only lists the caller's teams.
 
@@ -169,7 +176,8 @@ Teams are not publicly listed. The authenticated `/teams/mine` endpoint only lis
 | --- | --- |
 | `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | OAuth app credentials |
 | `STRAVA_WEBHOOK_VERIFY_TOKEN` | Webhook subscription handshake |
-| `OPENAI_API_KEY` | Optional photo-to-cartoon avatar generation |
+| `OPENAI_API_KEY` | Optional: avatar generation and AI coach comments |
+| `OPENAI_TEXT_MODEL` | Coach model, default `gpt-5.4-mini` |
 | `TOKEN_ENCRYPTION_KEY` | Encrypts Strava tokens at rest |
 | `SESSION_SECRET` | Signs member session cookies |
 | `DATABASE_URL` | Postgres connection |
@@ -217,5 +225,5 @@ Put the returned `id` into `STRAVA_WEBHOOK_SUBSCRIPTION_ID`.
 
 ## Status
 
-- Done: landing, imprint, privacy, Strava login, team create/join/overview, avatars, backfill, webhooks, live race-day countdown, weekly team highlights, recent runs and training-based finish estimates.
-- Next: route map, split-level fastest kilometre, AI recaps, team posters, terms page. Weekly comments currently use real stats and templates, not an LLM.
+- Done: landing, imprint, privacy, Strava login, team create/join/overview, avatars (incl. iPhone HEIC), backfill, webhooks, detail/stream sync, live countdown, weekly highlights with true fastest km, recent runs, finish estimates, AI coach roasts.
+- Next: route map (streams are already stored), team posters, terms page.

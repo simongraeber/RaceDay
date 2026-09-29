@@ -54,6 +54,12 @@ class AvatarTests(unittest.TestCase):
         with self.assertRaises(avatar.InvalidImage):
             avatar.normalize_image(b"not an image")
 
+    def test_iphone_heic_photo_is_converted_to_png(self):
+        output = BytesIO()
+        Image.new("RGB", (80, 60), "#3366aa").save(output, format="HEIF")
+        with Image.open(BytesIO(avatar.normalize_image(output.getvalue()))) as result:
+            self.assertEqual((result.format, result.size), ("PNG", (80, 60)))
+
     def test_generated_avatar_must_have_a_transparent_background(self):
         with self.assertRaises(avatar.GenerationFailed):
             avatar.to_avatar(image_bytes())

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     strava_webhook_subscription_id: int | None = None
 
     openai_api_key: str = ""
+    openai_text_model: str = "gpt-5.4-mini"
 
     # Fernet key for Strava tokens at rest
     token_encryption_key: str

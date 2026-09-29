@@ -9,8 +9,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session
-from app.models import Activity, Athlete
-from app.services import strava
+from app.models import Activity, ActivityDetail, Athlete
+from app.services import strava, team_cache
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +93,7 @@ async def backfill(athlete_id: int) -> None:
                 page += 1
             athlete.last_synced_at = datetime.now(timezone.utc)
             await db.commit()
+            team_cache.clear()
         except strava.StravaError:
             log.warning("Backfill for athlete %s stopped", athlete_id, exc_info=True)
 
@@ -129,6 +130,7 @@ async def handle_event(event: dict) -> None:
                 if (event.get("updates") or {}).get("authorized") == "false" and await _is_revoked(db, athlete):
                     await db.delete(athlete)
                     await db.commit()
+                    team_cache.clear()
                 return
 
             if event.get("object_type") == "activity":
@@ -139,6 +141,9 @@ async def handle_event(event: dict) -> None:
                     # Activity is no longer visible to us (e.g. switched to "Only Me")
                     data = None
                 await upsert_activity(db, athlete.id, object_id, data)
+                # Re-fetch splits/streams in the background after an edit
+                await db.execute(delete(ActivityDetail).where(ActivityDetail.activity_id == object_id))
                 await db.commit()
+                team_cache.clear()
         except strava.StravaError:
             log.warning("Webhook event for athlete %s failed", owner_id, exc_info=True)

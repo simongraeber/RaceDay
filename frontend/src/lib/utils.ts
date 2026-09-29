@@ -28,3 +28,8 @@ export function formatDuration(seconds: number): string {
   const ss = String(s).padStart(2, "0")
   return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`
 }
+
+export function formatPace(secondsPerKm: number | null): string {
+  if (secondsPerKm === null) return "—"
+  return `${Math.floor(secondsPerKm / 60)}:${String(secondsPerKm % 60).padStart(2, "0")}`
+}
