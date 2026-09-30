@@ -60,6 +60,13 @@ def pace_seconds_km(distance_m: float, seconds: int) -> int | None:
     return round(seconds * 1000 / distance_m)
 
 
+def format_pace_per_km(seconds_per_km: int | float | None) -> str | None:
+    if seconds_per_km is None:
+        return None
+    minutes, seconds = divmod(round(seconds_per_km), 60)
+    return f"{minutes}:{seconds:02d} /km"
+
+
 def best_km(run: Run) -> int | None:
     times = [e["elapsed_time"] for e in run.best_efforts if abs((e.get("distance") or 0) - 1000) < 1 and e.get("elapsed_time")]
     return min(times) if times else None
@@ -272,8 +279,12 @@ def summarize(
             "longest_run_last_12_weeks_km": round(longest_run_m / 1000, 1),
             "days_since_last_run": (now - runs[0].start).days if runs else None,
             "last_run_km": round(last_run.distance_m / 1000, 1) if last_run else None,
-            "last_run_pace_s_per_km": pace_seconds_km(last_run.distance_m, last_run.moving_time_s) if last_run else None,
-            "average_pace_last_7_days_s_per_km": pace_seconds_km(recent_distance_m, recent_moving_time_s),
+            "last_run_pace": format_pace_per_km(
+                pace_seconds_km(last_run.distance_m, last_run.moving_time_s) if last_run else None
+            ),
+            "average_pace_last_7_days": format_pace_per_km(
+                pace_seconds_km(recent_distance_m, recent_moving_time_s)
+            ),
             "predicted_finish_s": prediction,
             "goal_finish_s": membership.goal_seconds,
             "best_1km_last_12_weeks_s": member.best_km_seconds,

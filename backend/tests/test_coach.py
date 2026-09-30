@@ -79,6 +79,7 @@ class CoachTests(unittest.TestCase):
 
         self.assertEqual(texts, {"R1": "R1 never rests."})
         self.assertEqual(json.loads(sent[0]["input"]), {"R1": {"km_last_7_days": 3}})
+        self.assertIn("already formatted as m:ss /km", sent[0]["instructions"])
         self.assertIn("vary the focus across runners and refreshes", sent[0]["instructions"])
         self.assertIn("average weekly pace", sent[0]["instructions"])
         self.assertEqual(sent[0]["text"]["format"]["type"], "json_schema")

@@ -28,6 +28,7 @@ Write exactly one short roast per runner (max 110 characters) based ONLY on the 
 Tone: cheeky, sarcastic, a little mean, like a grumpy coach who secretly cares.
 Example: "R1 seems to think they are the Flash and don't need to train."
 Data: *_km are kilometres, *_s are seconds (lower finish time = faster), null means unknown.
+Pace facts are already formatted as m:ss /km. Treat them as pace, never as seconds per kilometre.
 Rules:
 - Refer to runners only by their id (R1, R2, ...). Use "they" or the id, never gendered pronouns.
 - Give each runner one short roast with a specific focus; vary the focus across runners and refreshes.

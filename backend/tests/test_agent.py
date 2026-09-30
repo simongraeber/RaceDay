@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from app.services.agent import build_db, personalize, pseudonymize, run_sql
+from app.services.agent import SQL_INSTRUCTIONS, build_db, format_results, personalize, pseudonymize, run_sql
 
 
 def sandbox():
@@ -34,6 +34,13 @@ class SandboxTests(unittest.TestCase):
             "WHERE effort = '5k' GROUP BY runner ORDER BY best_5k",
         )
         self.assertEqual(rows, [["R2", 1400]])
+
+    def test_query_results_format_pace_as_minute_per_kilometre(self):
+        result = format_results(["runner", "average_pace_s_per_km"], [["R1", 245]])
+        self.assertIn("average_pace", result)
+        self.assertIn("4:05 /km", result)
+        self.assertNotIn("245", result)
+        self.assertIn("include the word 'pace' in its result-column alias", SQL_INSTRUCTIONS)
 
     def test_writes_and_escapes_are_rejected(self):
         db = sandbox()
