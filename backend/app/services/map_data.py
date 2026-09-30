@@ -13,9 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models import Activity, Athlete, Avatar, AvatarRig, Membership, Team
-from app.schemas.maps import MapOut, TrackOut
+from app.schemas.maps import MapOut, RouteOut, TrackOut
 
 HISTORY = timedelta(days=365)
+TRACK_WINDOW = timedelta(days=7)
 HEAT_RUNS = 200
 HEAT_POINTS = 6_000
 TRACK_POINTS = 150
@@ -85,18 +86,33 @@ def group_runs(runs: list[_Run]) -> dict[int, int]:
 
 def build(team_id: uuid.UUID, rows: list[tuple], runs: list[_Run], now: datetime) -> MapOut:
     heat = [thin(r.path, max(2, HEAT_POINTS // max(1, len(runs)))) for r in runs]
-    newest: dict[int, _Run] = {}
-    for run in runs:
-        newest.setdefault(run.athlete_id, run)
-
     names = {
         athlete.id: (athlete.display_name, avatar_id, rig_id, athlete.avatar_url) for athlete, avatar_id, rig_id in rows
     }
-    latest = sorted(newest.values(), key=lambda r: r.start, reverse=True)
-    groups = group_runs(latest)
+    recent = [run for run in runs if run.start >= now - TRACK_WINDOW]
+    groups = group_runs(recent)
+    candidates: dict[int, list[tuple[_Run, int]]] = {}
+    for index, run in enumerate(recent):
+        candidates.setdefault(run.athlete_id, []).append((run, groups[index]))
+
     tracks = []
-    for index, run in enumerate(latest):
-        name, avatar_id, rig_id, profile_url = names.get(run.athlete_id, ("Runner", None, None, None))
+    for athlete_id, routes in candidates.items():
+        routes.sort(key=lambda item: item[0].start, reverse=True)
+        run, group = routes[0]
+        name, avatar_id, rig_id, profile_url = names.get(athlete_id, ("Runner", None, None, None))
+        route_data = [
+            RouteOut(
+                date=route.start.date(),
+                distance_km=round(route.distance_m / 1000, 1),
+                duration_s=route.moving_time_s,
+                pace_seconds_km=round(route.moving_time_s * 1000 / route.distance_m)
+                if route.distance_m >= 1000
+                else None,
+                group=route_group,
+                path=thin(route.path, TRACK_POINTS),
+            )
+            for route, route_group in routes
+        ]
         tracks.append(
             TrackOut(
                 name=name,
@@ -104,11 +120,12 @@ def build(team_id: uuid.UUID, rows: list[tuple], runs: list[_Run], now: datetime
                 avatar_is_generated=avatar_id is not None,
                 rig_url=f"/api/v1/teams/{team_id}/rigs/{rig_id}" if rig_id else None,
                 date=run.start.date(),
-                distance_km=round(run.distance_m / 1000, 1),
+                distance_km=route_data[0].distance_km,
                 duration_s=run.moving_time_s,
-                pace_seconds_km=round(run.moving_time_s * 1000 / run.distance_m) if run.distance_m >= 1000 else None,
-                group=groups[index],
-                path=thin(run.path, TRACK_POINTS),
+                pace_seconds_km=route_data[0].pace_seconds_km,
+                group=group,
+                path=route_data[0].path,
+                routes=route_data,
             )
         )
     return MapOut(heat=heat, tracks=tracks, days=HISTORY.days, generated_at=now)

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { MapPinned } from "lucide-react"
 import RunnerSprite from "@/components/team/RunnerSprite"
-import { api, type TeamMap, type Track } from "@/lib/api"
+import { api, type MapRoute, type TeamMap, type Track } from "@/lib/api"
 import { loadMapkit } from "@/lib/mapkit"
 
 // Everyone runs 30x real time so a Sunday long run fits into a minute
@@ -10,6 +10,29 @@ const SPEED = 30
 const FRAME_MS = 40
 // Home turf: the map opens here unless the team's routes are somewhere else entirely
 const HOME = { north: 48.28162846561217, west: 11.472049612467698, south: 48.054257854159516, east: 11.730924273482833 }
+
+function chooseRoute(routes: MapRoute[], previousIndex = -1): { route: MapRoute; index: number } {
+  const options = routes.map((route, index) => ({ route, index })).filter(({ index }) => index !== previousIndex)
+  const choices = options.length ? options : routes.map((route, index) => ({ route, index }))
+  return choices[Math.floor(Math.random() * choices.length)]
+}
+
+function routeDuration(route: MapRoute): number {
+  return Math.max(4, route.duration_s / SPEED) * 1000
+}
+
+type MovingSprite = {
+  track: Track
+  routes: MapRoute[]
+  routeIndex: number
+  route: MapRoute
+  element: HTMLDivElement
+  root: Root
+  annotation: any
+  lengths: number[]
+  duration: number
+  startedAt: number
+}
 
 function homeShare(paths: [number, number][][]): number {
   const points = paths.flat()
@@ -104,48 +127,69 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
           map.showItems(heat, { animate: false, padding: new mapkit.Padding(32, 32, 32, 32) })
         }
 
-        // Runs done together share a group, so they keep the same clock and stay side by side
-        const groupDuration = new Map<number, number>()
-        data.tracks.forEach((t) => {
-          groupDuration.set(t.group, Math.min(groupDuration.get(t.group) ?? Infinity, t.duration_s))
-        })
-        const groupIndex = new Map<number, number>()
-
-        const sprites = data.tracks.map((track: Track) => {
+        const sprites: MovingSprite[] = data.tracks.map((track: Track) => {
+          const routes = track.routes?.length ? track.routes : [track]
+          const selection = chooseRoute(routes)
           const element = document.createElement("div")
           const root = createRoot(element)
-          root.render(<RunnerSprite track={track} />)
+          root.render(<RunnerSprite track={{ ...track, ...selection.route }} />)
           roots.push(root)
-          const seen = groupIndex.get(track.group) ?? 0
-          groupIndex.set(track.group, seen + 1)
           const annotation = new mapkit.Annotation(
-            new mapkit.Coordinate(track.path[0][0], track.path[0][1]),
+            new mapkit.Coordinate(selection.route.path[0][0], selection.route.path[0][1]),
             () => element,
-            { anchorOffset: new DOMPoint(seen * 18, -32) },
+            { anchorOffset: new DOMPoint(0, -32) },
           )
           return {
             track,
+            routes,
+            routeIndex: selection.index,
+            route: selection.route,
             element,
+            root,
             annotation,
-            lengths: legLengths(track.path),
-            duration: Math.max(4, (groupDuration.get(track.group) ?? track.duration_s) / SPEED) * 1000,
+            lengths: legLengths(selection.route.path),
+            duration: routeDuration(selection.route),
+            startedAt: performance.now(),
           }
         })
+
+        const updateGroupOffsets = () => {
+          const groupIndex = new Map<number, number>()
+          for (const sprite of sprites) {
+            const seen = groupIndex.get(sprite.route.group) ?? 0
+            groupIndex.set(sprite.route.group, seen + 1)
+            sprite.annotation.anchorOffset = new DOMPoint(seen * 18, -32)
+          }
+        }
+
+        updateGroupOffsets()
         map.addAnnotations(sprites.map((s) => s.annotation))
         if (reduceMotion) return
 
-        const start = performance.now()
         let last = 0
         const step = (now: number) => {
           frame = requestAnimationFrame(step)
           if (now - last < FRAME_MS) return
           last = now
+          let groupChanged = false
           for (const sprite of sprites) {
-            const progress = ((now - start) % sprite.duration) / sprite.duration
-            const [lat, lng, mirrored] = pointAt(sprite.track.path, sprite.lengths, progress)
+            if (now - sprite.startedAt >= sprite.duration) {
+              const selection = chooseRoute(sprite.routes, sprite.routeIndex)
+              sprite.routeIndex = selection.index
+              sprite.route = selection.route
+              sprite.lengths = legLengths(selection.route.path)
+              sprite.duration = routeDuration(selection.route)
+              sprite.startedAt = now
+              sprite.annotation.coordinate = new mapkit.Coordinate(selection.route.path[0][0], selection.route.path[0][1])
+              sprite.root.render(<RunnerSprite track={{ ...sprite.track, ...selection.route }} />)
+              groupChanged = true
+            }
+            const progress = Math.min(1, (now - sprite.startedAt) / sprite.duration)
+            const [lat, lng, mirrored] = pointAt(sprite.route.path, sprite.lengths, progress)
             sprite.annotation.coordinate = new mapkit.Coordinate(lat, lng)
             sprite.element.firstElementChild?.classList.toggle("is-mirrored", mirrored)
           }
+          if (groupChanged) updateGroupOffsets()
         }
         frame = requestAnimationFrame(step)
       })
