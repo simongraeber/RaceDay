@@ -120,7 +120,7 @@ def build_db(team: dict, runners: list[dict], runs: list[dict]) -> sqlite3.Conne
         CREATE TABLE runs (id INTEGER PRIMARY KEY, runner TEXT, start_time TEXT, day TEXT, sport_type TEXT,
             distance_km REAL, moving_time_s INTEGER, elapsed_time_s INTEGER, pace_s_per_km REAL,
             elevation_gain_m REAL, kudos INTEGER, pr_count INTEGER);
-        CREATE TABLE best_efforts (run_id INTEGER, runner TEXT, effort TEXT, distance_m REAL,
+        CREATE TABLE best_efforts (run_id INTEGER, runner TEXT, effort TEXT COLLATE NOCASE, distance_m REAL,
             elapsed_time_s INTEGER, pr_rank INTEGER);
         CREATE TABLE splits (run_id INTEGER, runner TEXT, km INTEGER, distance_m REAL, moving_time_s INTEGER,
             elevation_difference_m REAL);

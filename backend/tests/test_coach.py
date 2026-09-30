@@ -1,7 +1,8 @@
 import asyncio
 import json
 import unittest
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import httpx
@@ -83,13 +84,25 @@ class CoachTests(unittest.TestCase):
         self.assertEqual(sent[0]["text"]["format"]["type"], "json_schema")
 
     def test_refresh_gate(self):
-        team_id = object()
+        team_id = uuid.uuid4()
         with patch.object(settings, "openai_api_key", ""):
             self.assertFalse(coach.should_refresh(team_id, view(), None))
         with patch.object(settings, "openai_api_key", "k"):
             self.assertTrue(coach.should_refresh(team_id, view(), None))
             fresh = TeamCoachNote(generated_at=datetime.now(timezone.utc), notes=[])
             self.assertFalse(coach.should_refresh(team_id, view(), fresh))
+
+    def test_refresh_is_due_after_eight_hours(self):
+        team_id = uuid.uuid4()
+        stale = TeamCoachNote(
+            generated_at=datetime.now(timezone.utc) - coach.REFRESH_AFTER - timedelta(minutes=1),
+            notes=[
+                {"athlete_id": 1, "text": "old"},
+                {"athlete_id": 2, "text": "old"},
+            ],
+        )
+        with patch.object(settings, "openai_api_key", "test"):
+            self.assertTrue(coach.should_refresh(team_id, view(), stale))
 
 
 if __name__ == "__main__":
