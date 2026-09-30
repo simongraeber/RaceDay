@@ -13,7 +13,7 @@ export default function CoachCard({ coach }: { coach: Coach }) {
           <Megaphone className="size-5 -rotate-12 text-primary" /> The Unfiltered Coach
         </h2>
         <span className="text-xs opacity-70">
-          {coach.source === "ai" ? "AI roast · refreshed twice a day" : "Coach's notes"}
+          {coach.source === "ai" ? "AI roast · refreshed a few times a day" : "Coach's notes"}
         </span>
       </div>
       <ul className="space-y-3">

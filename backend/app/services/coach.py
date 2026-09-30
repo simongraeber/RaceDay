@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -6,18 +7,20 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx
+from sqlalchemy import or_, select
 
 from app.config import settings
 from app.database import async_session
-from app.models import Team, TeamCoachNote
+from app.models import Membership, Team, TeamCoachNote
 from app.schemas.teams import CoachNoteOut, CoachOut
 from app.services import team_cache
 from app.services.team_stats import TeamView, load_team_view
 
 log = logging.getLogger(__name__)
 
-REFRESH_AFTER = timedelta(hours=12)
+REFRESH_AFTER = timedelta(hours=8)
 RETRY_AFTER_S = 30 * 60
+SCAN_INTERVAL_S = 15 * 60
 MAX_CHARS = 140
 
 INSTRUCTIONS = """You write the "Unfiltered Coach" card on a running team's race countdown page.
@@ -169,3 +172,34 @@ async def refresh(team_id: uuid.UUID) -> None:
         log.warning("Coach notes for team %s failed", team_id, exc_info=True)
     finally:
         _running.discard(team_id)
+
+
+async def refresh_due_teams() -> int:
+    cutoff = datetime.now(timezone.utc) - REFRESH_AFTER
+    async with async_session() as db:
+        team_ids = await db.scalars(
+            select(Team.id)
+            .join(Membership, Membership.team_id == Team.id)
+            .outerjoin(TeamCoachNote, TeamCoachNote.team_id == Team.id)
+            .where(
+                Membership.visible.is_(True),
+                or_(TeamCoachNote.team_id.is_(None), TeamCoachNote.generated_at < cutoff),
+            )
+            .distinct()
+        )
+        due = list(team_ids)
+
+    for team_id in due:
+        await refresh(team_id)
+    return len(due)
+
+
+async def run_forever(interval_s: int = SCAN_INTERVAL_S) -> None:
+    await asyncio.sleep(30)
+    while True:
+        try:
+            if settings.openai_api_key:
+                await refresh_due_teams()
+        except Exception:
+            log.exception("Coach refresh cycle failed")
+        await asyncio.sleep(interval_s)
