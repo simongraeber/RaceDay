@@ -16,6 +16,16 @@ class TrackOut(BaseModel):
     # Runs sharing a group started together, so their avatars run side by side
     group: int
     path: list[tuple[float, float]]
+    routes: list["RouteOut"]
+
+
+class RouteOut(BaseModel):
+    date: date
+    distance_km: float
+    duration_s: int
+    pace_seconds_km: int | None
+    group: int
+    path: list[tuple[float, float]]
 
 
 class MapOut(BaseModel):

@@ -89,6 +89,16 @@ export interface Track {
   pace_seconds_km: number | null
   group: number
   path: [number, number][]
+  routes: MapRoute[]
+}
+
+export interface MapRoute {
+  date: string
+  distance_km: number
+  duration_s: number
+  pace_seconds_km: number | null
+  group: number
+  path: [number, number][]
 }
 
 export interface TeamMap {

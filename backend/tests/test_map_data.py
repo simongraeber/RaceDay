@@ -32,17 +32,19 @@ class MapDataTests(unittest.TestCase):
         self.assertNotEqual(groups[2], groups[0])
         self.assertNotEqual(groups[3], groups[0])
 
-    def test_build_uses_newest_run_per_runner(self):
+    def test_build_includes_recent_routes_per_runner_and_keeps_newest_as_default(self):
         rows = [(Athlete(id=1, firstname="Simon", lastname="G"), None, None)]
         runs = [
             _Run(1, NOW, 8000, 2400, path(48.1, 11.5)),
             _Run(1, NOW - timedelta(days=2), 12000, 3600, path(48.2, 11.6)),
+            _Run(1, NOW - timedelta(days=8), 15000, 4500, path(48.3, 11.7)),
         ]
         view = build(TEAM, rows, runs, NOW)
-        self.assertEqual(len(view.heat), 2)
+        self.assertEqual(len(view.heat), 3)
         self.assertEqual(len(view.tracks), 1)
         track = view.tracks[0]
         self.assertEqual((track.name, track.distance_km, track.pace_seconds_km), ("Simon G.", 8.0, 300))
+        self.assertEqual([route.date for route in track.routes], [NOW.date(), (NOW - timedelta(days=2)).date()])
         self.assertFalse(track.avatar_is_generated)
 
     def test_generated_avatar_is_team_scoped(self):
