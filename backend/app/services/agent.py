@@ -44,7 +44,7 @@ race: name (text), race_day (text 'YYYY-MM-DD'), distance_km (real)
 Notes:
 - Runners are ONLY referred to by their id (R1, R2, ...). Never invent names.
 - best_efforts and splits exist only for runs whose details were already imported.
-- Format paces as m:ss per km and durations as h:mm:ss where helpful.\
+- Pace values in query results are automatically formatted as m:ss /km; always keep that unit and never call them seconds per kilometre. Durations use h:mm:ss where helpful.\
 """
 
 SQL_INSTRUCTIONS = """\
@@ -53,6 +53,7 @@ Rules:
 - Output ONLY the SQL. No markdown fences, no explanation, no semicolons.
 - Read-only: never INSERT/UPDATE/DELETE/CREATE/DROP/ATTACH/PRAGMA.
 - Return at most 50 rows. Use descriptive column aliases.
+- If returning any pace value or pace calculation, include the word 'pace' in its result-column alias; results are displayed in m:ss /km.
 - Always include the runner column for per-runner results.
 - Use the current date given above for time filters, e.g. day >= date('now', '-7 days').\
 """
@@ -246,7 +247,18 @@ def personalize(components: list, runners: dict[str, tuple[str, str | None]]) ->
 
 
 def format_results(columns: list[str], rows: list[list]) -> str:
-    out = f"Columns: {columns}\n" + "".join(f"{row}\n" for row in rows[:30])
+    pace_columns = {index for index, column in enumerate(columns) if "pace" in column.lower()}
+    display_columns = [column.replace("_s_per_km", "") for column in columns]
+    formatted_rows = []
+    for row in rows[:30]:
+        formatted = []
+        for index, value in enumerate(row):
+            if index in pace_columns and isinstance(value, (int, float)) and not isinstance(value, bool):
+                total_seconds = round(value)
+                value = f"{total_seconds // 60}:{total_seconds % 60:02d} /km"
+            formatted.append(value)
+        formatted_rows.append(formatted)
+    out = f"Columns: {display_columns}\n" + "".join(f"{row}\n" for row in formatted_rows)
     if len(rows) > 30:
         out += f"... and {len(rows) - 30} more rows\n"
     return out if rows else out + "(no rows returned)\n"

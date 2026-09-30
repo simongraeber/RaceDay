@@ -80,10 +80,10 @@ class TeamStatsTests(unittest.TestCase):
         self.assertEqual(view.facts[1]["goal_finish_s"], 6000)
         self.assertEqual(view.facts[2]["km_last_4_weeks"], 25.0)
         self.assertEqual(view.facts[1]["last_run_km"], 8.0)
-        self.assertEqual(view.facts[1]["last_run_pace_s_per_km"], 300)
-        self.assertEqual(view.facts[1]["average_pace_last_7_days_s_per_km"], 300)
+        self.assertEqual(view.facts[1]["last_run_pace"], "5:00 /km")
+        self.assertEqual(view.facts[1]["average_pace_last_7_days"], "5:00 /km")
         self.assertIsNone(view.facts[3]["last_run_km"])
-        self.assertIsNone(view.facts[3]["average_pace_last_7_days_s_per_km"])
+        self.assertIsNone(view.facts[3]["average_pace_last_7_days"])
         self.assertEqual(view.members[1][1].best_km_seconds, 245)
         self.assertEqual(view.members[0][1].runs_7d, 1)
 
