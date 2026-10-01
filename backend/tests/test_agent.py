@@ -1,7 +1,13 @@
+import asyncio
+import json
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
-from app.services.agent import SQL_INSTRUCTIONS, build_db, format_results, personalize, pseudonymize, run_sql
+from app.services.agent import (
+    SQL_INSTRUCTIONS, Sandbox, answer, build_db, format_results, load_sandbox, personalize, pseudonymize, run_sql,
+)
 
 
 def sandbox():
@@ -77,6 +83,56 @@ class SandboxTests(unittest.TestCase):
             "type": "ranked-list", "icon": "trophy", "title": "Simon G. leads",
             "items": [{"label": "Simon G.", "value": "10 km", "image_urls": ["/api/v1/avatars/1"]}],
         }])
+
+    def test_malformed_components_are_dropped_before_rendering(self):
+        runners = {"R1": ("Simon G.", None)}
+        components = personalize([
+            {"type": "ranked-list", "icon": "trophy", "title": "Missing items"},
+            {"type": "bar-chart", "title": "Wrong value", "bars": [{"label": "R1", "value": "ten"}]},
+            {"type": "callout", "emoji": "!", "text": "Valid R1 result"},
+        ], runners)
+        self.assertEqual(components, [{"type": "callout", "emoji": "!", "text": "Valid Simon G. result"}])
+
+    def test_answer_uses_query_results_and_restores_runner_names(self):
+        prompts = []
+
+        async def complete(_client, _instructions, prompt, json_output):
+            prompts.append((prompt, json_output))
+            if not json_output:
+                return "SELECT runner, SUM(distance_km) AS total_km FROM runs GROUP BY runner ORDER BY total_km DESC"
+            self.assertIn("['R1', 10.0]", prompt)
+            self.assertIn("['R2', 5.0]", prompt)
+            return json.dumps({"action": "answer", "components": [{
+                "type": "ranked-list", "icon": "trophy", "title": "Distance leaders",
+                "items": [{"label": "R1", "value": "10 km"}, {"label": "R2", "value": "5 km"}],
+            }]})
+
+        runners = {"R1": ("Simon G.", None), "R2": ("Anna X.", None)}
+        box = Sandbox(sandbox(), runners, "R1", "Current date/time (UTC): 2026-10-01 12:00")
+        with patch("app.services.agent.complete", side_effect=complete):
+            components = asyncio.run(answer(box, "Who ran the most?"))
+
+        self.assertEqual([item["label"] for item in components[0]["items"]], ["Simon G.", "Anna X."])
+        self.assertNotIn("Simon", prompts[0][0])
+
+    def test_sandbox_query_only_loads_the_last_year(self):
+        class FakeDb:
+            statement = None
+
+            async def execute(self, statement):
+                self.statement = statement
+                return SimpleNamespace(all=lambda: [])
+
+        member = SimpleNamespace(name="Simon G.", avatar_url=None, goal_seconds=5400)
+        view = SimpleNamespace(members=[(1, member)])
+        team = SimpleNamespace(race_name="Half", race_date=date(2027, 4, 4), race_distance_m=21097)
+        db = FakeDb()
+        with patch("app.services.agent.load_team_view", new=AsyncMock(return_value=view)):
+            box = asyncio.run(load_sandbox(db, team, 1))
+
+        cutoff = next(value for value in db.statement.compile().params.values() if isinstance(value, datetime))
+        self.assertLess(abs((datetime.now(timezone.utc) - cutoff) - timedelta(days=365)), timedelta(seconds=2))
+        box.db.close()
 
 
 if __name__ == "__main__":

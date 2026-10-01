@@ -11,7 +11,7 @@ import re
 import sqlite3
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from sqlalchemy import select
@@ -24,6 +24,7 @@ from app.services.team_stats import load_team_view
 
 MAX_ROWS = 50
 TIMEOUT_S = 3.0
+ACTIVITY_WINDOW = timedelta(days=365)
 COMPONENT_TYPES = {"ranked-list", "stat-highlight", "comparison", "bar-chart", "table", "callout", "head-to-head"}
 ALIAS = re.compile(r"\bR\d+\b")
 
@@ -180,6 +181,7 @@ def run_sql(db: sqlite3.Connection, sql: str) -> tuple[list[str], list[list]]:
 async def load_sandbox(db: AsyncSession, team: Team, asker_id: int) -> Sandbox:
     view = await load_team_view(db, team)
     aliases = {athlete_id: f"R{i}" for i, (athlete_id, _) in enumerate(view.members, start=1)}
+    now = datetime.now(timezone.utc)
     rows = (
         await db.execute(
             select(
@@ -189,7 +191,7 @@ async def load_sandbox(db: AsyncSession, team: Team, asker_id: int) -> Sandbox:
                 ActivityDetail.splits,
             )
             .outerjoin(ActivityDetail, ActivityDetail.activity_id == Activity.id)
-            .where(Activity.athlete_id.in_(aliases))
+            .where(Activity.athlete_id.in_(aliases), Activity.start_date >= now - ACTIVITY_WINDOW)
             .order_by(Activity.start_date)
         )
     ).all()
@@ -209,7 +211,7 @@ async def load_sandbox(db: AsyncSession, team: Team, asker_id: int) -> Sandbox:
         f"Runners: {', '.join(aliases.values()) or '(none)'}\n"
         f"The person asking is: {asker or 'a team member who is hidden from the stats'}\n"
         f"Race: {team.race_name} on {team.race_date.isoformat()} ({team.race_distance_m / 1000:g} km)\n"
-        f"Current date/time (UTC): {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
+        f"Current date/time (UTC): {now.strftime('%Y-%m-%d %H:%M')}"
     )
     return Sandbox(sqlite_db, {aliases[a]: (m.name, m.avatar_url) for a, m in view.members}, asker, context)
 
@@ -243,7 +245,53 @@ def personalize(components: list, runners: dict[str, tuple[str, str | None]]) ->
             return ALIAS.sub(lambda m: runners[m[0]][0] if m[0] in runners else "someone", node)
         return node
 
-    return [visit(c) for c in components if isinstance(c, dict) and c.get("type") in COMPONENT_TYPES][:3]
+    return [visit(c) for c in components if valid_component(c)][:3]
+
+
+def valid_component(component) -> bool:
+    if not isinstance(component, dict) or component.get("type") not in COMPONENT_TYPES:
+        return False
+
+    def strings(node, keys):
+        return isinstance(node, dict) and all(isinstance(node.get(key), str) for key in keys)
+
+    component_type = component["type"]
+    if component_type == "ranked-list":
+        return strings(component, ("icon", "title")) and isinstance(component.get("items"), list) and all(
+            strings(item, ("label", "value")) for item in component["items"]
+        )
+    if component_type == "stat-highlight":
+        return strings(component, ("icon", "label", "value")) and (
+            component.get("subtitle") is None or isinstance(component["subtitle"], str)
+        )
+    if component_type == "comparison":
+        return strings(component, ("title",)) and isinstance(component.get("sides"), list) and all(
+            strings(side, ("name",)) and isinstance(side.get("stats"), list)
+            and all(strings(stat, ("label", "value")) for stat in side["stats"])
+            for side in component["sides"]
+        )
+    if component_type == "bar-chart":
+        return strings(component, ("title",)) and isinstance(component.get("bars"), list) and all(
+            strings(bar, ("label",)) and isinstance(bar.get("value"), (int, float))
+            and not isinstance(bar["value"], bool) for bar in component["bars"]
+        )
+    if component_type == "table":
+        columns = component.get("columns")
+        return strings(component, ("title",)) and isinstance(columns, list) and all(
+            isinstance(column, str) for column in columns
+        ) and isinstance(component.get("rows"), list) and all(
+            isinstance(row, dict) and all(
+                column not in row or isinstance(row[column], (str, int, float)) and not isinstance(row[column], bool)
+                for column in columns
+            ) for row in component["rows"]
+        )
+    if component_type == "callout":
+        return strings(component, ("emoji", "text"))
+    return strings(component, ()) and all(
+        strings(component.get(player), ("name",)) for player in ("player_a", "player_b")
+    ) and isinstance(component.get("stats"), list) and all(
+        strings(stat, ("label", "a", "b")) for stat in component["stats"]
+    )
 
 
 def format_results(columns: list[str], rows: list[list]) -> str:

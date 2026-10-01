@@ -56,7 +56,7 @@ function AvatarStack({ urls, name, size = "sm" }: { urls?: string[]; name: strin
 function RankedListCard({ icon, title, items }: Extract<AIComponent, { type: "ranked-list" }>) {
   const { icon: Icon, color } = ICON_MAP[icon] ?? ICON_MAP.star
   return (
-    <Card className="rounded-2xl bg-background">
+    <Card className="rounded-lg bg-background">
       <CardContent className="pt-5 pb-4">
         <div className="mb-3 flex items-center gap-2">
           <Icon className={`size-5 shrink-0 ${color}`} />
@@ -82,7 +82,7 @@ function RankedListCard({ icon, title, items }: Extract<AIComponent, { type: "ra
 function StatHighlightCard({ icon, label, value, subtitle, image_urls }: Extract<AIComponent, { type: "stat-highlight" }>) {
   const { icon: Icon, color } = ICON_MAP[icon] ?? ICON_MAP.star
   return (
-    <Card className="rounded-2xl bg-background">
+    <Card className="rounded-lg bg-background">
       <CardContent className="flex items-center gap-4 pt-5 pb-4">
         {image_urls?.length ? (
           <AvatarStack urls={image_urls} name={label} size="md" />
@@ -103,7 +103,7 @@ function StatHighlightCard({ icon, label, value, subtitle, image_urls }: Extract
 
 function ComparisonCard({ title, sides }: Extract<AIComponent, { type: "comparison" }>) {
   return (
-    <Card className="rounded-2xl bg-background">
+    <Card className="rounded-lg bg-background">
       <CardContent className="pt-5 pb-4">
         <p className="mb-3 text-center text-sm font-semibold">{title}</p>
         <div className="grid grid-cols-2 gap-4">
@@ -128,7 +128,7 @@ function ComparisonCard({ title, sides }: Extract<AIComponent, { type: "comparis
 function BarChartCard({ title, bars }: Extract<AIComponent, { type: "bar-chart" }>) {
   const max = Math.max(...bars.map((b) => b.value), 1)
   return (
-    <Card className="rounded-2xl bg-background">
+    <Card className="rounded-lg bg-background">
       <CardContent className="pt-5 pb-4">
         <p className="mb-3 text-sm font-semibold">{title}</p>
         <div className="space-y-2">
@@ -154,7 +154,7 @@ function BarChartCard({ title, bars }: Extract<AIComponent, { type: "bar-chart" 
 
 function TableCard({ title, columns, rows }: Extract<AIComponent, { type: "table" }>) {
   return (
-    <Card className="rounded-2xl bg-background">
+    <Card className="rounded-lg bg-background">
       <CardContent className="pt-5 pb-4">
         <p className="mb-3 text-sm font-semibold">{title}</p>
         <div className="overflow-x-auto">
@@ -182,7 +182,7 @@ function TableCard({ title, columns, rows }: Extract<AIComponent, { type: "table
 
 function CalloutCard({ emoji, text }: Extract<AIComponent, { type: "callout" }>) {
   return (
-    <Card className="flex items-start gap-2 rounded-2xl bg-background px-4 py-3">
+    <Card className="flex items-start gap-2 rounded-lg bg-background px-4 py-3">
       <span className="text-lg">{emoji}</span>
       <p className="text-sm leading-relaxed text-foreground">{text}</p>
     </Card>
@@ -191,7 +191,7 @@ function CalloutCard({ emoji, text }: Extract<AIComponent, { type: "callout" }>)
 
 function HeadToHeadCard({ player_a, player_b, stats }: Extract<AIComponent, { type: "head-to-head" }>) {
   return (
-    <Card className="rounded-2xl bg-background">
+    <Card className="rounded-lg bg-background">
       <CardContent className="pt-5 pb-4">
         <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           {[player_a, player_b].map((p, i) => (
@@ -294,8 +294,7 @@ export default function AskAI({ teamId }: { teamId: string }) {
           <Sparkles className="size-5 text-purple-500" /> Ask AI
         </h2>
       </div>
-      <Card className="overflow-visible">
-        <CardContent className="space-y-4">
+      <div className="space-y-4">
           <AIShimmerBorder active={loading}>
             <form onSubmit={(e) => { e.preventDefault(); handleAsk() }} className="flex gap-2 p-0">
               <Input
@@ -312,6 +311,10 @@ export default function AskAI({ teamId }: { teamId: string }) {
               </Button>
             </form>
           </AIShimmerBorder>
+
+          <div className="sr-only" role="status" aria-live="polite">
+            {loading ? "Analyzing team runs" : result ? "Answer ready" : ""}
+          </div>
 
           {!result && !error && !loading && (
             <div className="flex flex-wrap gap-1.5">
@@ -333,6 +336,7 @@ export default function AskAI({ teamId }: { teamId: string }) {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
+                role="alert"
                 className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive"
               >
                 {error}
@@ -377,8 +381,7 @@ export default function AskAI({ teamId }: { teamId: string }) {
               </motion.div>
             )}
           </AnimatePresence>
-        </CardContent>
-      </Card>
+      </div>
     </section>
   )
 }
