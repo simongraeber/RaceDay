@@ -73,16 +73,33 @@ class CoachTests(unittest.TestCase):
 
         real_client = httpx.AsyncClient
         with patch.object(settings, "openai_api_key", "test"), patch.object(
+            coach.random, "choice", return_value="weekly volume"
+        ), patch.object(
             coach.httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(respond))
         ):
             texts = asyncio.run(coach.ask_model({"R1": {"km_last_7_days": 3}}))
 
         self.assertEqual(texts, {"R1": "R1 never rests."})
-        self.assertEqual(json.loads(sent[0]["input"]), {"R1": {"km_last_7_days": 3}})
+        self.assertEqual(
+            json.loads(sent[0]["input"]),
+            {"R1": {"km_last_7_days": 3, "assigned_focus": "weekly volume"}},
+        )
         self.assertIn("already formatted as m:ss /km", sent[0]["instructions"])
-        self.assertIn("vary the focus across runners and refreshes", sent[0]["instructions"])
+        self.assertIn("runner's assigned_focus", sent[0]["instructions"])
         self.assertIn("average weekly pace", sent[0]["instructions"])
         self.assertEqual(sent[0]["text"]["format"]["type"], "json_schema")
+
+    def test_focus_is_chosen_independently_for_each_runner(self):
+        facts = {
+            "R1": {"km_last_7_days": 3},
+            "R2": {"km_last_7_days": 8},
+        }
+        with patch.object(coach.random, "choice", side_effect=["weekly volume", "monthly volume"]) as choice:
+            focused = coach.with_random_focuses(facts)
+
+        self.assertEqual(choice.call_count, 2)
+        self.assertEqual(focused["R1"]["assigned_focus"], "weekly volume")
+        self.assertEqual(focused["R2"]["assigned_focus"], "monthly volume")
 
     def test_refresh_gate(self):
         team_id = uuid.uuid4()

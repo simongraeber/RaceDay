@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import random
 import re
 import time
 import uuid
@@ -31,7 +32,7 @@ Data: *_km are kilometres, *_s are seconds (lower finish time = faster), null me
 Pace facts are already formatted as m:ss /km. Treat them as pace, never as seconds per kilometre.
 Rules:
 - Refer to runners only by their id (R1, R2, ...). Use "they" or the id, never gendered pronouns.
-- Give each runner one short roast with a specific focus; vary the focus across runners and refreshes.
+- Give each runner one short roast about that runner's assigned_focus. Do not use a different topic.
 - Pick from the available evidence: last run distance or pace, average weekly pace, fastest kilometre,
     weekly or monthly volume, consistency or rest, longest run, or race prediction vs goal.
 - Do not default to distance or mileage. Do not repeat the same angle for every runner, and never
@@ -59,6 +60,29 @@ SCHEMA = {
 
 _running: set[uuid.UUID] = set()
 _last_attempt: dict[uuid.UUID, float] = {}
+
+FOCUS_OPTIONS = {
+    "last run distance or pace": ("last_run_km", "last_run_pace"),
+    "average weekly pace": ("average_pace_last_7_days",),
+    "fastest kilometre": ("best_1km_last_12_weeks_s",),
+    "weekly volume": ("km_last_7_days",),
+    "monthly volume": ("km_last_4_weeks",),
+    "consistency or rest": ("runs_last_7_days", "days_since_last_run"),
+    "longest run": ("longest_run_last_12_weeks_km",),
+    "race prediction vs goal": ("predicted_finish_s", "goal_finish_s"),
+}
+
+
+def with_random_focuses(facts: dict[str, dict]) -> dict[str, dict]:
+    focused = {}
+    for runner, runner_facts in facts.items():
+        available = [
+            topic
+            for topic, keys in FOCUS_OPTIONS.items()
+            if any(runner_facts.get(key) is not None for key in keys)
+        ]
+        focused[runner] = {**runner_facts, "assigned_focus": random.choice(available)}
+    return focused
 
 
 def fallback_notes(view: TeamView) -> list[CoachNoteOut]:
@@ -120,6 +144,7 @@ def _output_text(data: dict) -> str:
 
 
 async def ask_model(facts: dict[str, dict]) -> dict[str, str]:
+    focused_facts = with_random_focuses(facts)
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
             "https://api.openai.com/v1/responses",
@@ -127,7 +152,7 @@ async def ask_model(facts: dict[str, dict]) -> dict[str, str]:
             json={
                 "model": settings.openai_text_model,
                 "instructions": INSTRUCTIONS,
-                "input": json.dumps(facts),
+                "input": json.dumps(focused_facts),
                 "max_output_tokens": 2000,
                 "text": {"format": {"type": "json_schema", "name": "coach_notes", "strict": True, "schema": SCHEMA}},
             },
