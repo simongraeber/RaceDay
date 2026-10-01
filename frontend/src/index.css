@@ -193,10 +193,12 @@ body {
 }
 .week-tile-art {
   position: absolute;
-  right: -1.25rem;
-  bottom: -0.5rem;
-  height: 108%;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  height: 86%;
   width: auto;
+  max-width: 68%;
+  object-fit: contain;
   opacity: 0.85;
   pointer-events: none;
   -webkit-mask-image: linear-gradient(to left, #000 45%, transparent 100%);

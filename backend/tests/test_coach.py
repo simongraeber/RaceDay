@@ -89,17 +89,16 @@ class CoachTests(unittest.TestCase):
         self.assertIn("average weekly pace", sent[0]["instructions"])
         self.assertEqual(sent[0]["text"]["format"]["type"], "json_schema")
 
-    def test_focus_is_chosen_independently_for_each_runner(self):
+    def test_focuses_are_randomized_without_repeats_when_possible(self):
         facts = {
-            "R1": {"km_last_7_days": 3},
-            "R2": {"km_last_7_days": 8},
+            "R1": {"km_last_7_days": 3, "km_last_4_weeks": 12},
+            "R2": {"km_last_7_days": 8, "km_last_4_weeks": 32},
         }
-        with patch.object(coach.random, "choice", side_effect=["weekly volume", "monthly volume"]) as choice:
+        with patch.object(coach.random, "shuffle") as shuffle:
             focused = coach.with_random_focuses(facts)
 
-        self.assertEqual(choice.call_count, 2)
-        self.assertEqual(focused["R1"]["assigned_focus"], "weekly volume")
-        self.assertEqual(focused["R2"]["assigned_focus"], "monthly volume")
+        self.assertNotEqual(focused["R1"]["assigned_focus"], focused["R2"]["assigned_focus"])
+        self.assertGreaterEqual(shuffle.call_count, 3)
 
     def test_refresh_gate(self):
         team_id = uuid.uuid4()
