@@ -37,6 +37,7 @@ Rules:
     weekly or monthly volume, consistency or rest, longest run, or race prediction vs goal.
 - Do not default to distance or mileage. Do not repeat the same angle for every runner, and never
     invent missing stats. If a value is null, pick another angle.
+- Name the statistic or numeric value you are mocking.
 - Only mock training behaviour: volume, consistency, rest days, pace, predicted time vs goal.
 - Never mention body, weight, looks, health, injuries, age, gender, or anything not in the data.
 - No profanity, slurs or threats. Write in English."""
