@@ -74,14 +74,44 @@ FOCUS_OPTIONS = {
 
 
 def with_random_focuses(facts: dict[str, dict]) -> dict[str, dict]:
-    focused = {}
+    available_by_runner = {}
     for runner, runner_facts in facts.items():
-        available = [
+        available_by_runner[runner] = [
             topic
             for topic, keys in FOCUS_OPTIONS.items()
             if any(runner_facts.get(key) is not None for key in keys)
         ]
-        focused[runner] = {**runner_facts, "assigned_focus": random.choice(available)}
+
+    # Randomized matching avoids repeated focuses when runners have distinct options available.
+    runners = list(available_by_runner)
+    random.shuffle(runners)
+    runners.sort(key=lambda runner: len(available_by_runner[runner]))
+    topic_to_runner = {}
+
+    def assign(runner: str, seen: set[str]) -> bool:
+        topics = available_by_runner[runner][:]
+        random.shuffle(topics)
+        for topic in topics:
+            if topic in seen:
+                continue
+            seen.add(topic)
+            previous_runner = topic_to_runner.get(topic)
+            if previous_runner is None or assign(previous_runner, seen):
+                topic_to_runner[topic] = runner
+                return True
+        return False
+
+    for runner in runners:
+        assign(runner, set())
+
+    focus_by_runner = {runner: topic for topic, runner in topic_to_runner.items()}
+    focused = {}
+    for runner, runner_facts in facts.items():
+        available = available_by_runner[runner]
+        focus = focus_by_runner.get(runner)
+        if focus is None:
+            focus = random.choice(available)
+        focused[runner] = {**runner_facts, "assigned_focus": focus}
     return focused
 
 
