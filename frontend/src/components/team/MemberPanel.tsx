@@ -43,7 +43,11 @@ export default function MemberPanel({ teamId, viewer, openAvatar, onChange }: Pr
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            {viewer.avatar_url && <img src={viewer.avatar_url} alt="Your avatar" className="size-12 rounded-full object-cover object-top" />}
+            {viewer.avatar_url && (
+              <span className="size-12 rounded-full object-cover-130">
+                <img src={viewer.avatar_url} alt="Your avatar" />
+              </span>
+            )}
             <div>
               <p className="font-semibold">Your runner</p>
               <p className="text-sm text-muted-foreground">{viewer.visible ? "Visible on this team page" : "Hidden from this team page"}</p>

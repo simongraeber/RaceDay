@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import Activity, ActivityDetail, Team
 from app.services.coach import _output_text
-from app.services.team_stats import load_team_view
+from app.services.team_stats import format_duration, load_team_view
 
 MAX_ROWS = 50
 TIMEOUT_S = 3.0
@@ -31,7 +31,8 @@ ALIAS = re.compile(r"\bR\d+\b")
 SCHEMA_DESCRIPTION = """\
 SQLite database with the running team's training data (only this team, last 12 months):
 
-runners: runner (text, id like 'R1'), goal_seconds (int, target race finish time, null if unset)
+runners: runner (text, id like 'R1'), goal_seconds (int, target race finish time, null if unset), \
+prediction_seconds (int, predicted race finish time, null if unknown)
 runs: id (int), runner (text, FK runners.runner), start_time (text 'YYYY-MM-DD HH:MM:SS' UTC), \
 day (text 'YYYY-MM-DD'), sport_type (text: Run/TrailRun/VirtualRun), distance_km (real), \
 moving_time_s (int), elapsed_time_s (int), pace_s_per_km (real, lower = faster), \
@@ -45,7 +46,8 @@ race: name (text), race_day (text 'YYYY-MM-DD'), distance_km (real)
 Notes:
 - Runners are ONLY referred to by their id (R1, R2, ...). Never invent names.
 - best_efforts and splits exist only for runs whose details were already imported.
-- Pace values in query results are automatically formatted as m:ss /km; always keep that unit and never call them seconds per kilometre. Durations use h:mm:ss where helpful.\
+- Pace values in query results are automatically formatted as m:ss /km; always keep that unit and never call them seconds per kilometre.
+- Race predictions, goal finish times and duration results are automatically formatted as h:mm:ss. Always keep that format, never display raw seconds.\
 """
 
 SQL_INSTRUCTIONS = """\
@@ -55,6 +57,7 @@ Rules:
 - Read-only: never INSERT/UPDATE/DELETE/CREATE/DROP/ATTACH/PRAGMA.
 - Return at most 50 rows. Use descriptive column aliases.
 - If returning any pace value or pace calculation, include the word 'pace' in its result-column alias; results are displayed in m:ss /km.
+- If returning a duration or race prediction/goal calculation, use a result-column alias ending in '_seconds'; results are displayed in h:mm:ss. Keep database values numeric for calculations and sorting.
 - Always include the runner column for per-runner results.
 - Use the current date given above for time filters, e.g. day >= date('now', '-7 days').\
 """
@@ -118,7 +121,7 @@ def build_db(team: dict, runners: list[dict], runs: list[dict]) -> sqlite3.Conne
     db = sqlite3.connect(":memory:", check_same_thread=False)
     db.executescript(
         """
-        CREATE TABLE runners (runner TEXT PRIMARY KEY, goal_seconds INTEGER);
+        CREATE TABLE runners (runner TEXT PRIMARY KEY, goal_seconds INTEGER, prediction_seconds INTEGER);
         CREATE TABLE runs (id INTEGER PRIMARY KEY, runner TEXT, start_time TEXT, day TEXT, sport_type TEXT,
             distance_km REAL, moving_time_s INTEGER, elapsed_time_s INTEGER, pace_s_per_km REAL,
             elevation_gain_m REAL, kudos INTEGER, pr_count INTEGER);
@@ -130,7 +133,10 @@ def build_db(team: dict, runners: list[dict], runs: list[dict]) -> sqlite3.Conne
         """
     )
     db.execute("INSERT INTO race VALUES (?, ?, ?)", (team["name"], team["day"], team["distance_km"]))
-    db.executemany("INSERT INTO runners VALUES (:runner, :goal_seconds)", runners)
+    db.executemany(
+        "INSERT INTO runners VALUES (?, ?, ?)",
+        [(runner["runner"], runner["goal_seconds"], runner.get("prediction_seconds")) for runner in runners],
+    )
     for i, r in enumerate(runs, start=1):
         km = r["distance_m"] / 1000
         db.execute(
@@ -203,7 +209,10 @@ async def load_sandbox(db: AsyncSession, team: Team, asker_id: int) -> Sandbox:
         }
         for r in rows
     ]
-    runners = [{"runner": aliases[a], "goal_seconds": m.goal_seconds} for a, m in view.members]
+    runners = [
+        {"runner": aliases[a], "goal_seconds": m.goal_seconds, "prediction_seconds": m.prediction_seconds}
+        for a, m in view.members
+    ]
     race = {"name": team.race_name, "day": team.race_date.isoformat(), "distance_km": team.race_distance_m / 1000}
     sqlite_db = await asyncio.to_thread(build_db, race, runners, runs)
     asker = aliases.get(asker_id)
@@ -296,6 +305,11 @@ def valid_component(component) -> bool:
 
 def format_results(columns: list[str], rows: list[list]) -> str:
     pace_columns = {index for index, column in enumerate(columns) if "pace" in column.lower()}
+    duration_columns = {
+        index for index, column in enumerate(columns)
+        if column.lower().endswith(("_seconds", "_s"))
+        or any(word in column.lower() for word in ("prediction", "predicted_finish", "goal_finish", "duration"))
+    }
     display_columns = [column.replace("_s_per_km", "") for column in columns]
     formatted_rows = []
     for row in rows[:30]:
@@ -304,6 +318,8 @@ def format_results(columns: list[str], rows: list[list]) -> str:
             if index in pace_columns and isinstance(value, (int, float)) and not isinstance(value, bool):
                 total_seconds = round(value)
                 value = f"{total_seconds // 60}:{total_seconds % 60:02d} /km"
+            elif index in duration_columns and isinstance(value, (int, float)) and not isinstance(value, bool):
+                value = format_duration(value)
             formatted.append(value)
         formatted_rows.append(formatted)
     out = f"Columns: {display_columns}\n" + "".join(f"{row}\n" for row in formatted_rows)

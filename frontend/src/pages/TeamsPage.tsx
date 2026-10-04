@@ -50,7 +50,11 @@ export default function TeamsPage() {
     <PageTransition className="mx-auto max-w-2xl px-4 py-12">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          {me.avatar_url && <img src={me.avatar_url} alt="" className="size-11 rounded-full object-cover object-top" />}
+          {me.avatar_url && (
+            <span className="size-11 rounded-full object-cover-130">
+              <img src={me.avatar_url} alt="" />
+            </span>
+          )}
           <div>
             <p className="mb-1 text-sm text-muted-foreground">Hi {me.name}</p>
             <h1 className="text-3xl font-bold">Your teams</h1>
