@@ -15,7 +15,7 @@ from app.database import async_session
 from app.models import Membership, Team, TeamCoachNote
 from app.schemas.teams import CoachNoteOut, CoachOut
 from app.services import team_cache
-from app.services.team_stats import TeamView, load_team_view
+from app.services.team_stats import TeamView, format_duration, load_team_view
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ Tone: cheeky, sarcastic, a little mean, like a grumpy coach who secretly cares.
 Example: "R1 seems to think they are the Flash and don't need to train."
 Data: *_km are kilometres, *_s are seconds (lower finish time = faster), null means unknown.
 Pace facts are already formatted as m:ss /km. Treat them as pace, never as seconds per kilometre.
+Race prediction and goal finish times are already formatted as h:mm:ss. Always keep that format.
 Rules:
 - Refer to runners only by their id (R1, R2, ...). Use "they" or the id, never gendered pronouns.
 - Give each runner one short roast about that runner's assigned_focus. Do not use a different topic.
@@ -176,6 +177,10 @@ def _output_text(data: dict) -> str:
 
 async def ask_model(facts: dict[str, dict]) -> dict[str, str]:
     focused_facts = with_random_focuses(facts)
+    for runner_facts in focused_facts.values():
+        for key in ("predicted_finish_s", "goal_finish_s"):
+            if key in runner_facts:
+                runner_facts[key.removesuffix("_s")] = format_duration(runner_facts.pop(key))
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
             "https://api.openai.com/v1/responses",

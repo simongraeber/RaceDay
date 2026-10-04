@@ -41,13 +41,12 @@ function AvatarStack({ urls, name, size = "sm" }: { urls?: string[]; name: strin
   return (
     <span className="flex items-center">
       {urls.map((url, i) => (
-        <img
+        <span
           key={url}
-          src={url}
-          alt={name}
-          loading="lazy"
-          className={cn(sizeClass, i > 0 && (size === "md" ? "-ml-3" : "-ml-2"), "rounded-full bg-muted object-cover object-top ring-2 ring-background")}
-        />
+          className={cn(sizeClass, i > 0 && (size === "md" ? "-ml-3" : "-ml-2"), "rounded-full bg-muted object-cover-130 ring-2 ring-background")}
+        >
+          <img src={url} alt={name} loading="lazy" />
+        </span>
       ))}
     </span>
   )

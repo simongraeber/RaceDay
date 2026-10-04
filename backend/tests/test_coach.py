@@ -77,13 +77,18 @@ class CoachTests(unittest.TestCase):
         ), patch.object(
             coach.httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(respond))
         ):
-            texts = asyncio.run(coach.ask_model({"R1": {"km_last_7_days": 3}}))
+            facts = {"R1": {"km_last_7_days": 3, "predicted_finish_s": 7265, "goal_finish_s": None}}
+            texts = asyncio.run(coach.ask_model(facts))
 
         self.assertEqual(texts, {"R1": "R1 never rests."})
+        payload = json.loads(sent[0]["input"])
+        self.assertIn(payload["R1"].pop("assigned_focus"), ("weekly volume", "race prediction vs goal"))
         self.assertEqual(
-            json.loads(sent[0]["input"]),
-            {"R1": {"km_last_7_days": 3, "assigned_focus": "weekly volume"}},
+            payload,
+            {"R1": {"km_last_7_days": 3, "predicted_finish": "2:01:05", "goal_finish": None}},
         )
+        self.assertEqual(facts["R1"]["predicted_finish_s"], 7265)
+        self.assertIn("formatted as h:mm:ss", sent[0]["instructions"])
         self.assertIn("already formatted as m:ss /km", sent[0]["instructions"])
         self.assertIn("runner's assigned_focus", sent[0]["instructions"])
         self.assertIn("average weekly pace", sent[0]["instructions"])

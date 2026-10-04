@@ -21,7 +21,10 @@ def sandbox():
          "elapsed_time_s": 1400, "elevation_gain_m": 0, "kudos": 0, "pr_count": 0,
          "best_efforts": [{"name": "5K", "distance": 5000, "elapsed_time": 1400, "pr_rank": 1}], "splits": []},
     ]
-    runners = [{"runner": "R1", "goal_seconds": 6000}, {"runner": "R2", "goal_seconds": None}]
+    runners = [
+        {"runner": "R1", "goal_seconds": 6000, "prediction_seconds": 7265},
+        {"runner": "R2", "goal_seconds": None, "prediction_seconds": None},
+    ]
     return build_db({"name": "HM", "day": "2027-04-04", "distance_km": 21.1}, runners, runs)
 
 
@@ -62,6 +65,27 @@ class SandboxTests(unittest.TestCase):
             with self.subTest(sql=sql), self.assertRaises(ValueError):
                 run_sql(db, sql)
         self.assertEqual(run_sql(db, "SELECT COUNT(*) FROM runs")[1], [[2]])
+
+    def test_race_times_are_formatted_without_changing_query_calculations(self):
+        columns, rows = run_sql(
+            sandbox(),
+            "SELECT runner, prediction_seconds, goal_seconds, "
+            "prediction_seconds - goal_seconds AS gap_seconds FROM runners ORDER BY prediction_seconds DESC",
+        )
+        self.assertEqual(rows, [["R1", 7265, 6000, 1265], ["R2", None, None, None]])
+        result = format_results(columns, rows)
+        self.assertIn("['R1', '2:01:05', '1:40:00', '0:21:05']", result)
+        self.assertIn("['R2', None, None, None]", result)
+        self.assertNotIn("7265", result)
+        self.assertIn("ending in '_seconds'", SQL_INSTRUCTIONS)
+
+    def test_duration_formatting_handles_zero_rounding_and_long_races(self):
+        result = format_results(
+            ["prediction_seconds", "goal_finish_s", "duration", "pace_s_per_km", "total_km"],
+            [[0, 3661.6, 90061, 245, 12.5], [None, None, -120, None, 0]],
+        )
+        self.assertIn("['0:00:00', '1:01:02', '25:01:01', '4:05 /km', 12.5]", result)
+        self.assertIn("[None, None, '-0:02:00', None, 0]", result)
 
     def test_runaway_queries_are_stopped(self):
         sql = "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n) SELECT COUNT(*) FROM n"
@@ -123,7 +147,7 @@ class SandboxTests(unittest.TestCase):
                 self.statement = statement
                 return SimpleNamespace(all=lambda: [])
 
-        member = SimpleNamespace(name="Simon G.", avatar_url=None, goal_seconds=5400)
+        member = SimpleNamespace(name="Simon G.", avatar_url=None, goal_seconds=5400, prediction_seconds=7265)
         view = SimpleNamespace(members=[(1, member)])
         team = SimpleNamespace(race_name="Half", race_date=date(2027, 4, 4), race_distance_m=21097)
         db = FakeDb()

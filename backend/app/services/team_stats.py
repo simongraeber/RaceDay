@@ -67,6 +67,16 @@ def format_pace_per_km(seconds_per_km: int | float | None) -> str | None:
     return f"{minutes}:{seconds:02d} /km"
 
 
+def format_duration(seconds: int | float | None) -> str | None:
+    if seconds is None:
+        return None
+    total_seconds = round(seconds)
+    sign = "-" if total_seconds < 0 else ""
+    hours, remainder = divmod(abs(total_seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{sign}{hours}:{minutes:02d}:{seconds:02d}"
+
+
 def best_km(run: Run) -> int | None:
     times = [e["elapsed_time"] for e in run.best_efforts if abs((e.get("distance") or 0) - 1000) < 1 and e.get("elapsed_time")]
     return min(times) if times else None

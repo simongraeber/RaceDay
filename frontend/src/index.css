@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@utility object-cover-130 {
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  & > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    transform: scale(1.3);
+    transform-origin: center top;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
