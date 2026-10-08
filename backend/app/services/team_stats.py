@@ -221,7 +221,7 @@ def stat_cards(
         n: [r.moving_time_s for r in rs if r.distance_m >= 1000 and r.moving_time_s > 0]
         for n, rs in per_runner.items()
     }
-    ranked("quick_escape", "clock", "Quick escape",
+    ranked("quick_escape", "clock", "Shortest run",
            {n: min(times) for n, times in short_runs.items() if times}, fmt_duration, lowest=True)
     gaps = {}
     for name, rs in (history or {}).items():
