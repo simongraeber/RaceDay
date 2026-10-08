@@ -112,7 +112,15 @@ async def get_team(
                         update={
                             "image_url": image_urls.get(card.key)
                             if card.key in card_art.GROUP_PROMPTS or card.key in card_art.SOLO_PROMPTS
-                            else card.image_url
+                            else card.image_url,
+                            "candidates": [
+                                candidate.model_copy(update={
+                                    "image_url": (image_urls.get(card.key) or candidate.image_url)
+                                    if candidate.detail == card.detail
+                                    else candidate.image_url
+                                })
+                                for candidate in card.candidates
+                            ],
                         }
                     )
                     for card in view.highlights.cards

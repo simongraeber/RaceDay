@@ -52,6 +52,7 @@ export interface StatCard {
   value: string
   detail: string
   image_url: string | null
+  candidates?: { name: string; detail: string; image_url: string | null }[]
 }
 
 export interface Highlights {

@@ -1,14 +1,14 @@
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from math import log2
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Activity, ActivityDetail, Athlete, Avatar, CardImage, Membership, Team
-from app.schemas.teams import HighlightsOut, MemberOut, RunOut, StatCardOut
+from app.schemas.teams import HighlightsOut, MemberOut, RunOut, StatCardCandidateOut, StatCardOut
 from app.services import team_cache
 
 WINDOW = timedelta(days=7)
@@ -150,7 +150,15 @@ def _min_or_none(values):
     return min(values) if values else None
 
 
-def stat_cards(window_runs: dict[str, list[Run]], race_distance_m: int) -> list[StatCardOut]:
+def run_day(run: Run) -> date:
+    return run.start.astimezone(timezone.utc).date()
+
+
+def stat_cards(
+    window_runs: dict[str, list[Run]],
+    race_distance_m: int,
+    history: dict[str, list[Run]] | None = None,
+) -> list[StatCardOut]:
     """Every card that has data for the window; the frontend shows a random selection."""
     runs = [(name, r) for name, rs in window_runs.items() for r in rs]
     if not runs:
@@ -161,44 +169,87 @@ def stat_cards(window_runs: dict[str, list[Run]], race_distance_m: int) -> list[
     def add(key, icon, label, value, detail):
         cards.append(StatCardOut(key=key, icon=icon, label=label, value=value, detail=detail))
 
+    def ranked(key, icon, label, scores, format_value, *, lowest=False, prefix=""):
+        if not scores:
+            return
+        best = (min if lowest else max)(scores.values())
+        names = [name for name, score in scores.items() if score == best]
+        add(key, icon, label, format_value(best), prefix + names[0])
+        cards[-1].candidates = [
+            StatCardCandidateOut(name=name, detail=prefix + name) for name in names
+        ]
+
     add("time", "clock", "Time on feet", fmt_duration(sum(r.moving_time_s for _, r in runs)), "All runners combined")
 
-    name, run = max(runs, key=lambda item: item[1].distance_m)
-    add("longest", "footprints", "Longest run", f"{run.distance_m / 1000:.1f} km", name)
+    ranked("longest", "footprints", "Longest run",
+           {n: max(round(r.distance_m / 1000, 1) for r in rs) for n, rs in per_runner.items()},
+           lambda km: f"{km:.1f} km")
 
-    name, run = max(runs, key=lambda item: item[1].moving_time_s)
-    add("endurance", "hourglass", "Longest time out", fmt_duration(run.moving_time_s), name)
+    ranked("endurance", "hourglass", "Longest time out",
+           {n: max(r.moving_time_s for r in rs) for n, rs in per_runner.items()}, fmt_duration)
 
-    kms = [(n, best_km(r)) for n, r in runs if best_km(r)]
-    if kms:
-        name, seconds = min(kms, key=lambda item: item[1])
-        add("fastest_km", "zap", "Fastest kilometre", fmt_duration(seconds), name)
+    kms = {n: [seconds for r in rs if (seconds := best_km(r))] for n, rs in per_runner.items()}
+    ranked("fastest_km", "zap", "Fastest kilometre",
+           {n: min(seconds) for n, seconds in kms.items() if seconds}, fmt_duration, lowest=True)
 
-    paced = [(n, pace_seconds_km(r.distance_m, r.moving_time_s)) for n, r in runs if r.distance_m >= 3000]
-    paced = [(n, p) for n, p in paced if p]
-    if paced:
-        name, pace = min(paced, key=lambda item: item[1])
-        add("pace", "gauge", "Quickest run pace", f"{fmt_duration(pace)} /km", name)
+    paces = {
+        n: [pace for r in rs if r.distance_m >= 3000
+            and (pace := pace_seconds_km(r.distance_m, r.moving_time_s)) is not None]
+        for n, rs in per_runner.items()
+    }
+    ranked("pace", "gauge", "Quickest run pace",
+           {n: min(ps) for n, ps in paces.items() if ps},
+           lambda pace: f"{fmt_duration(pace)} /km", lowest=True)
 
-    name, rs = max(per_runner.items(), key=lambda item: len(item[1]))
-    add("most_runs", "trophy", "Most outings", f"{len(rs)} runs", name)
+    ranked("most_runs", "trophy", "Most outings",
+           {n: len(rs) for n, rs in per_runner.items()}, lambda count: f"{count} runs")
+    ranked("consistency", "calendar", "Most consistent",
+           {n: len({run_day(r) for r in rs}) for n, rs in per_runner.items()},
+           lambda count: f"{count} of 7 days")
+    ranked("volume", "flame", "Biggest mileage",
+           {n: round(sum(r.distance_m for r in rs) / 1000, 1) for n, rs in per_runner.items()},
+           lambda km: f"{km:.1f} km")
 
-    name, rs = max(per_runner.items(), key=lambda item: len({r.start.date() for r in item[1]}))
-    add("consistency", "calendar", "Most consistent", f"{len({r.start.date() for r in rs})} of 7 days", name)
-
-    name, rs = max(per_runner.items(), key=lambda item: sum(r.distance_m for r in item[1]))
-    add("volume", "flame", "Biggest mileage", f"{sum(r.distance_m for r in rs) / 1000:.1f} km", name)
+    ranked("steady_rhythm", "gauge", "Steady rhythm",
+           {n: max(ps) - min(ps) for n, ps in paces.items() if len(ps) >= 2},
+           lambda spread: f"{spread}s /km spread", lowest=True)
+    weekend = {n: sum(r.distance_m for r in rs if run_day(r).weekday() >= 5) for n, rs in per_runner.items()}
+    ranked("weekend", "calendar", "Weekend miles",
+           {n: round(m / 1000, 1) for n, m in weekend.items() if m >= 100},
+           lambda km: f"{km:.1f} km")
+    short_runs = {
+        n: [r.moving_time_s for r in rs if r.distance_m >= 1000 and r.moving_time_s > 0]
+        for n, rs in per_runner.items()
+    }
+    ranked("quick_escape", "clock", "Quick escape",
+           {n: min(times) for n, times in short_runs.items() if times}, fmt_duration, lowest=True)
+    gaps = {}
+    for name, rs in (history or {}).items():
+        ordered = sorted(rs, key=lambda r: r.start)
+        breaks = [
+            (run_day(current) - run_day(previous)).days - 1
+            for previous, current in zip(ordered, ordered[1:])
+            if current in per_runner.get(name, [])
+        ]
+        if breaks and max(breaks) >= 2:
+            gaps[name] = max(breaks)
+    ranked("comeback", "footprints", "Back out there", gaps, lambda days: f"{days} days away")
+    ranked("latest", "flag", "Latest outing",
+           {n: max(run_day(r) for r in rs) for n, rs in per_runner.items()},
+           lambda day: f"{day:%d %b} UTC")
 
     climbed = sum(r.elevation_m for _, r in runs)
     if climbed >= 1:
         add("climbed", "mountain", "Climbed together", f"{round(climbed)} m", f"{climbed / EIFFEL_TOWER_M:.1f}\u00d7 the Eiffel Tower")
-        name, rs = max(per_runner.items(), key=lambda item: sum(r.elevation_m for r in item[1]))
-        add("climber", "mountain-snow", "Mountain goat", f"{round(sum(r.elevation_m for r in rs))} m", name)
+        ranked("climber", "mountain-snow", "Mountain goat",
+               {n: round(sum(r.elevation_m for r in rs)) for n, rs in per_runner.items()},
+               lambda meters: f"{meters} m")
 
     kudos = sum(r.kudos for _, r in runs)
     if kudos:
-        name, rs = max(per_runner.items(), key=lambda item: sum(r.kudos for r in item[1]))
-        add("kudos", "heart", "Kudos collected", str(kudos), f"Most loved: {name}")
+        ranked("kudos", "heart", "Kudos collected",
+               {n: sum(r.kudos for r in rs) for n, rs in per_runner.items()},
+               lambda _: str(kudos), prefix="Most loved: ")
 
     prs = sum(r.pr_count for _, r in runs)
     if prs:
@@ -223,6 +274,16 @@ def _attach_card_art(
     """Link cached artwork to its card and report the pairs that still need one."""
     wanted = []
     for card in cards:
+        for candidate in card.candidates:
+            athlete_id = athlete_ids[candidate.name]
+            image_id = stored.get((athlete_id, card.key))
+            if image_id:
+                candidate.image_url = f"/api/v1/teams/{team.id}/cards/{image_id}"
+            elif len(card.candidates) > 1 or card.key in ART_CARDS:
+                wanted.append((athlete_id, card.key))
+        if card.candidates:
+            card.image_url = card.candidates[0].image_url
+            continue
         athlete_id = athlete_ids.get(card.detail) if card.key in ART_CARDS else None
         if athlete_id is None:
             continue
@@ -301,7 +362,10 @@ def summarize(
         }
 
     all_recent = [r for rs in window_runs.values() for r in rs]
-    cards = stat_cards(window_runs, team.race_distance_m)
+    cards = stat_cards(
+        window_runs, team.race_distance_m,
+        {athlete.display_name: runs_by_athlete.get(athlete.id, []) for athlete, _, _ in rows},
+    )
     art_wanted = _attach_card_art(team, cards, {m.name: athlete_id for athlete_id, m in members}, card_art or {})
     highlights = HighlightsOut(
         window_days=WINDOW.days,

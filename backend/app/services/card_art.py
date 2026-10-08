@@ -21,14 +21,6 @@ from app.services.team_stats import TeamView, load_team_view
 
 log = logging.getLogger(__name__)
 
-PROMPTS = {
-    "longest": "completely drenched in sweat after a very long run, exhausted but grinning, thumbs up",
-    "endurance": "still running after hours, legs wobbling, eyes half closed, comically tired but refusing to stop",
-    "fastest_km": "sprinting at full speed, leaning far forward, cartoon speed lines and little flames at the shoes",
-    "climber": "running steeply uphill, leaning forward, hands pushing on the thighs, cheeks puffed out",
-    "volume": "proudly carrying a huge stack of kilometre road signs, worn-out running shoes, triumphant pose",
-    "missing": "lounging lazily on a small sofa in running clothes, snack in hand, running shoes left unused",
-}
 GROUP_PROMPTS = {
     "together": "a lively, slightly chaotic team portrait at the starting line",
     "time": "celebrating a comically tall stack of stopwatches after a long week",
@@ -48,6 +40,15 @@ SOLO_PROMPTS = {
     "volume": "proudly carrying a huge stack of kilometre road signs, worn-out running shoes, triumphant pose",
     "climber": "running steeply uphill, leaning forward, hands pushing on the thighs, cheeks puffed out",
     "kudos": "grinning beneath a shower of colorful heart-shaped confetti",
+    "steady_rhythm": "running with an even, relaxed stride beside a playful metronome",
+    "weekend": "enjoying a relaxed weekend run under a little sun, cheerful and carefree",
+    "quick_escape": "dashing out for a short run, happily holding a tiny stopwatch",
+    "comeback": "eagerly tying running shoes after a break, ready to get moving again",
+    "latest": "finishing a fresh run with a cheerful wave and a triumphant smile",
+}
+PROMPTS = {
+    **SOLO_PROMPTS,
+    "missing": "lounging lazily on a small sofa in running clothes, snack in hand, running shoes left unused",
 }
 MAX_PER_RUN = 3
 RETRY_AFTER_S = 30 * 60

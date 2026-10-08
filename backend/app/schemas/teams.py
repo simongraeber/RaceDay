@@ -43,6 +43,12 @@ class MemberOut(BaseModel):
     recent_runs: list[RunOut]
 
 
+class StatCardCandidateOut(BaseModel):
+    name: str
+    detail: str
+    image_url: str | None = None
+
+
 class StatCardOut(BaseModel):
     key: str
     icon: str
@@ -50,6 +56,7 @@ class StatCardOut(BaseModel):
     value: str
     detail: str
     image_url: str | None = None
+    candidates: list[StatCardCandidateOut] = Field(default_factory=list)
 
 
 class HighlightsOut(BaseModel):
