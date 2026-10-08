@@ -13,6 +13,8 @@ export default function JoinTeamCard({ teamId }: { teamId: string }) {
           12 months — including private and followers-only ones — with anyone who has this link. Routes
           are shown for runs shared with followers or everyone on Strava, with start and end cut off.
           Runs set to Only You have no route shown. You can hide yourself or leave any time.
+          Available average and maximum heart rate are used privately to refine your race estimate;
+          the team only sees whether recent heart-rate data is available, not the readings.
         </p>
         <StravaConnectButton href={stravaLoginUrl("join", teamId)} />
       </CardContent>

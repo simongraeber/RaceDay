@@ -41,6 +41,7 @@ export interface Member {
   runs_7d: number
   last_4_weeks_km: number
   prediction_seconds: number | null
+  has_heart_rate_data: boolean
   best_km_seconds: number | null
   recent_runs: { date: string; distance_km: number; pace_seconds_km: number | null }[]
 }

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Activity, ActivityDetail, Athlete, Avatar, CardImage, Membership, Team
 from app.schemas.teams import HighlightsOut, MemberOut, RunOut, StatCardCandidateOut, StatCardOut
 from app.services import team_cache
+from app.services.heart_rate import usable_heart_rate
 
 WINDOW = timedelta(days=7)
 PREDICTION_WINDOW = timedelta(days=84)
@@ -28,6 +29,7 @@ MAX_EXTRAPOLATION_RATIO = 5
 FRESH_DAYS = 28
 STALE_PENALTY_PER_WEEK = 0.004
 MAX_STALE_PENALTY = 0.05
+MAX_HEART_RATE_ADJUSTMENT = 0.02
 EIFFEL_TOWER_M = 330
 # Cards about a single runner that get AI artwork of their avatar
 ART_CARDS = ("longest", "endurance", "fastest_km", "climber", "volume", "missing")
@@ -42,6 +44,8 @@ class Run:
     kudos: int
     best_efforts: list[dict] = field(default_factory=list)
     pr_count: int = 0
+    average_heartrate: float | None = None
+    max_heartrate: float | None = None
 
 
 @dataclass
@@ -100,7 +104,7 @@ def stale_factor(age_days: float) -> float:
 
 
 def predict_finish(
-    efforts: list[tuple[float, int, float]],
+    efforts: list[tuple[float, float, float]],
     distance_m: int,
     weekly_km: float = 0.0,
     longest_run_m: float = 0.0,
@@ -122,15 +126,26 @@ def predict_finish(
     return round(best[len(best) // 2])
 
 
-def race_efforts(runs: list[Run], now: datetime) -> list[tuple[float, int, float]]:
+def race_efforts(runs: list[Run], now: datetime) -> list[tuple[float, float, float]]:
     """(metres, seconds, age in days) for whole runs and their best efforts within the window."""
     since = now - PREDICTION_WINDOW
+    hr_runs = [
+        r for r in runs if r.start >= since and r.moving_time_s >= 1200
+        and usable_heart_rate(r.average_heartrate, r.max_heartrate)
+    ]
+    # Observed peaks are not a lab-tested maximum: require repeated readings and cap
+    # the easy-run allowance. A whole run's HR must never calibrate a short best effort.
+    observed_peak = max(r.max_heartrate for r in hr_runs if r.max_heartrate is not None) if len(hr_runs) >= 3 else None
     efforts = []
     for run in runs:
         if run.start < since:
             continue
         age = (now - run.start).total_seconds() / 86_400
-        efforts.append((run.distance_m, run.moving_time_s, age))
+        allowance = 0.0
+        if (observed_peak and run.average_heartrate is not None and run.moving_time_s >= 1200
+                and usable_heart_rate(run.average_heartrate, run.max_heartrate)):
+            allowance = MAX_HEART_RATE_ADJUSTMENT * min(1.0, max(0.0, (0.85 - run.average_heartrate / observed_peak) / 0.1))
+        efforts.append((run.distance_m, run.moving_time_s * (1 - allowance), age))
         efforts.extend(
             (e["distance"], e["elapsed_time"], age)
             for e in run.best_efforts
@@ -332,6 +347,7 @@ def summarize(
             runs_7d=len(recent),
             last_4_weeks_km=last_4_weeks_km,
             prediction_seconds=prediction,
+            has_heart_rate_data=any(usable_heart_rate(r.average_heartrate, r.max_heartrate) for r in twelve_weeks),
             best_km_seconds=_min_or_none(best_km(r) for r in twelve_weeks),
             recent_runs=[
                 RunOut(
@@ -404,6 +420,8 @@ async def load_team_view(db: AsyncSession, team: Team, use_cache: bool = True) -
             ActivityDetail.kudos_count,
             ActivityDetail.best_efforts,
             ActivityDetail.pr_count,
+            ActivityDetail.average_heartrate,
+            ActivityDetail.max_heartrate,
         )
         .outerjoin(ActivityDetail, ActivityDetail.activity_id == Activity.id)
         .where(
@@ -412,8 +430,10 @@ async def load_team_view(db: AsyncSession, team: Team, use_cache: bool = True) -
         )
         .order_by(Activity.start_date.desc())
     )
-    for athlete_id, start, distance, moving, elevation, kudos, efforts, prs in result:
-        runs_by_athlete[athlete_id].append(Run(start, distance, moving, elevation, kudos or 0, efforts or [], prs or 0))
+    for athlete_id, start, distance, moving, elevation, kudos, efforts, prs, average_hr, max_hr in result:
+        runs_by_athlete[athlete_id].append(
+            Run(start, distance, moving, elevation, kudos or 0, efforts or [], prs or 0, average_hr, max_hr)
+        )
 
     art = {
         (athlete_id, key): image_id

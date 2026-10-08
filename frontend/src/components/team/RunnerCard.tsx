@@ -1,10 +1,12 @@
+import { useId } from "react"
 import { motion, useReducedMotion } from "framer-motion"
-import { ArrowUpRight, CalendarDays, Timer, Zap } from "lucide-react"
+import { ArrowUpRight, CalendarDays, HeartCrack, Timer, Zap } from "lucide-react"
 import type { Member } from "@/lib/api"
 import { formatDate, formatDuration, formatPace } from "@/lib/utils"
 
 export default function RunnerCard({ member, index }: { member: Member; index: number }) {
   const reduceMotion = useReducedMotion()
+  const heartRateHintId = useId()
   const textWidth = member.avatar_is_generated ? "max-w-[50%]" : "max-w-[65%]"
 
   return (
@@ -20,7 +22,21 @@ export default function RunnerCard({ member, index }: { member: Member; index: n
         <h3 className={`mt-1 break-words text-xl font-bold leading-tight sm:text-2xl ${textWidth}`}>{member.name}</h3>
 
         <div className={`mt-5 ${textWidth}`}>
-          <p className="text-xs font-medium opacity-75">Training-based finish</p>
+          <div className="relative flex items-center gap-1.5 text-xs font-medium">
+            <span className="opacity-75">Training-based finish</span>
+            {!member.has_heart_rate_data && (
+              <span className="group inline-flex">
+                <button type="button" aria-label="No recent heart-rate data" aria-describedby={heartRateHintId}
+                  className="rounded opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2">
+                  <HeartCrack className="size-3.5" aria-hidden="true" />
+                </button>
+                <span id={heartRateHintId} role="tooltip"
+                  className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-52 rounded-lg bg-card p-3 text-xs font-normal text-card-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                  No usable heart-rate data in the last 12 weeks. This estimate is less accurate without heart-rate data.
+                </span>
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-3xl font-bold tabular-nums sm:text-4xl">
             {member.prediction_seconds ? formatDuration(member.prediction_seconds) : "—"}
           </p>

@@ -50,8 +50,11 @@ export default function PrivacyPage() {
         </ul>
         <p>
           Private and followers-only runs count towards your team's statistics and are shown there like
-          any other run, so only connect if you are comfortable with that. We never store heart-rate data,
-          and we remove the first and last 400 metres of every route and GPS track before storing it.
+          any other run, so only connect if you are comfortable with that. When available, we store
+          average and maximum heart rate to refine the deterministic race estimate. We never store
+          heart-rate streams or expose heart-rate values to your team or AI services. Your team can
+          see whether recent heart-rate data is available. We remove the first and last 400 metres
+          of every route and GPS track before storing it.
         </p>
 
         <h2>5. Optional AI avatar</h2>
