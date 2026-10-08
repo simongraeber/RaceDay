@@ -114,7 +114,7 @@ def should_refresh(team_id: uuid.UUID, view: TeamView) -> bool:
 async def generate(avatar_png: bytes, prompt: str) -> bytes:
     full_prompt = (
         f"Redraw the character from the image: {prompt}. "
-        "Keep the same character, face, hair, skin tone, outfit style and 3D cartoon look. "
+        "Keep the same character, face, hair, skin tone, outfit style and 3D cartoon look with slightly exaggerated head. "
         "Full body, head to toe, centered with a small margin. "
         "Cut out on a fully transparent background: no scenery, no landscape, no floor, no ground, "
         "no shadow plate, no text, no logos, no other people."
