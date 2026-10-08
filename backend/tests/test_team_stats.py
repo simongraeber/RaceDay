@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from app.models import Athlete, Membership, Team
 from app.services.enrich import detail_values, trim_streams
 from app.services.sync import can_share_route
-from app.services.team_stats import Run, pace_seconds_km, predict_finish, race_efforts, summarize
+from app.services.team_stats import Run, pace_seconds_km, predict_finish, race_efforts, stat_cards, summarize
 
 NOW = datetime(2026, 9, 30, 12, tzinfo=timezone.utc)  # a Wednesday
 
@@ -104,6 +104,74 @@ class TeamStatsTests(unittest.TestCase):
     def test_no_prediction_after_race_day(self):
         view = summarize(team(date(2026, 4, 4)), [member(1, "Simon")], {1: [run(10000, 3000, 1)]}, NOW)
         self.assertIsNone(view.members[0][1].prediction_seconds)
+
+    def test_all_equal_winners_are_candidates_once_per_person(self):
+        cards = {c.key: c for c in stat_cards({
+            "Simon": [run(5000, 1500, 0), run(5000, 1500, 1), run(5000, 1500, 2)],
+            "Jonathan": [run(5000, 1500, 0), run(5000, 1500, 1), run(5000, 1500, 2)],
+            "Theo": [run(5000, 1500, 0)],
+            "Inactive": [],
+        }, 21097)}
+        for key in ["longest", "endurance", "pace", "quick_escape", "latest"]:
+            self.assertEqual([c.name for c in cards[key].candidates], ["Simon", "Jonathan", "Theo"])
+        for key in ["most_runs", "consistency", "volume", "climber", "kudos", "steady_rhythm"]:
+            self.assertEqual([c.name for c in cards[key].candidates], ["Simon", "Jonathan"])
+        self.assertEqual(cards["consistency"].value, "3 of 7 days")
+
+    def test_equal_displayed_distance_is_a_tie(self):
+        cards = {c.key: c for c in stat_cards({
+            "Simon": [run(5040, 1500)],
+            "Jonathan": [run(5010, 1490)],
+            "Theo": [run(4900, 1600)],
+        }, 21097)}
+        self.assertEqual(cards["longest"].value, "5.0 km")
+        self.assertEqual([c.name for c in cards["longest"].candidates], ["Simon", "Jonathan"])
+
+    def test_five_new_cards_use_qualifying_runs_and_history(self):
+        runs = {
+            1: [run(5000, 1500, 1), run(5000, 1600, 3), run(5000, 1500, 9)],
+            2: [run(6000, 2100, 0), run(6000, 2112, 4), run(6000, 2100, 3)],
+        }
+        view = summarize(team(), [member(1, "Simon"), member(2, "Theo")], runs, NOW)
+        cards = {c.key: c for c in view.highlights.cards}
+        self.assertEqual((cards["steady_rhythm"].value, cards["steady_rhythm"].detail), ("2s /km spread", "Theo X."))
+        self.assertEqual((cards["weekend"].value, cards["weekend"].detail), ("12.0 km", "Theo X."))
+        self.assertEqual((cards["quick_escape"].value, cards["quick_escape"].detail), ("25:00", "Simon X."))
+        self.assertEqual((cards["comeback"].value, cards["comeback"].detail), ("5 days away", "Simon X."))
+        self.assertEqual((cards["latest"].value, cards["latest"].detail), ("30 Sep UTC", "Theo X."))
+
+    def test_optional_cards_require_evidence(self):
+        cards = {c.key: c for c in stat_cards({"Simon": [run(900, 200, 0)]}, 21097)}
+        self.assertNotIn("steady_rhythm", cards)
+        self.assertNotIn("weekend", cards)
+        self.assertNotIn("quick_escape", cards)
+        self.assertNotIn("comeback", cards)
+        self.assertIn("latest", cards)
+
+    def test_day_based_cards_use_utc_boundaries(self):
+        saturday_local = Run(datetime(2026, 9, 26, 1, tzinfo=timezone(timedelta(hours=2))),
+                             5000, 1500, 0, 0)
+        friday_utc = Run(datetime(2026, 9, 25, 22, tzinfo=timezone.utc), 5000, 1500, 0, 0)
+        cards = {c.key: c for c in stat_cards({"Simon": [saturday_local, friday_utc]}, 21097)}
+        self.assertNotIn("weekend", cards)
+        self.assertEqual(cards["consistency"].value, "1 of 7 days")
+        self.assertEqual(cards["latest"].value, "25 Sep UTC")
+
+    def test_comeback_does_not_invent_a_break_without_previous_runs(self):
+        recent = {"Simon": [run(5000, 1500, 1)]}
+        cards = {c.key: c for c in stat_cards(recent, 21097, recent)}
+        self.assertNotIn("comeback", cards)
+
+    def test_each_tied_candidate_gets_only_their_own_art(self):
+        ids = [uuid.uuid4(), uuid.uuid4()]
+        view = summarize(team(), [member(1, "Simon"), member(2, "Theo")],
+                         {1: [run(5000, 1500)], 2: [run(5000, 1500)]}, NOW,
+                         {(1, "most_runs"): ids[0], (2, "most_runs"): ids[1]})
+        card = next(c for c in view.highlights.cards if c.key == "most_runs")
+        self.assertEqual([c.image_url.rsplit("/", 1)[-1] for c in card.candidates], [str(i) for i in ids])
+        self.assertEqual(card.image_url, card.candidates[0].image_url)
+        self.assertIn((1, "consistency"), view.art_wanted)
+        self.assertIn((2, "consistency"), view.art_wanted)
 
 
 class EnrichTests(unittest.TestCase):

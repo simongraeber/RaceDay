@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 import {
   Activity, CalendarCheck, Clock3, Flag, Flame, Footprints, Gauge, Ghost, Heart, Hourglass,
@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { Highlights } from "@/lib/api"
+import { selectWeeklyCards } from "@/lib/weeklyHighlights"
 
 const ICONS: Record<string, LucideIcon> = {
   clock: Clock3,
@@ -26,22 +27,9 @@ const ICONS: Record<string, LucideIcon> = {
 }
 const SHOWN = 8
 
-function shuffled<T>(items: T[]): T[] {
-  const copy = [...items]
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[copy[i], copy[j]] = [copy[j], copy[i]]
-  }
-  return copy
-}
-
 export default function WeeklyHighlights({ highlights, teamName }: { highlights: Highlights; teamName: string }) {
   const reduceMotion = useReducedMotion()
-  // A fresh random pick of categories and colours on every visit, artwork cards never miss out
-  const [cards] = useState(() => {
-    const pool = shuffled(highlights.cards)
-    return shuffled([...pool.filter((c) => c.image_url), ...pool.filter((c) => !c.image_url)].slice(0, SHOWN))
-  })
+  const cards = useMemo(() => selectWeeklyCards(highlights.cards, SHOWN), [highlights.cards])
   const [offset] = useState(() => Math.floor(Math.random() * 4))
   const items = [
     {

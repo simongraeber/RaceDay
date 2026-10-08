@@ -2,19 +2,20 @@ import asyncio
 import base64
 import unittest
 import uuid
+from datetime import date
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from PIL import Image
 from starlette.requests import Request
 
 from app.api.v1.avatars import require_site_origin
 from app.api.v1 import teams
 from app.config import settings
-from app.schemas.teams import HighlightsOut, MemberOut, StatCardOut
+from app.schemas.teams import CoachOut, HighlightsOut, MemberOut, StatCardCandidateOut, StatCardOut
 from app.services import avatar
 from app.services import card_art
 from app.services.team_stats import TeamView
@@ -35,6 +36,35 @@ def transparent_avatar() -> bytes:
 
 
 class AvatarTests(unittest.TestCase):
+    def test_team_response_keeps_tied_candidates_art_separate_and_cache_unchanged(self):
+        team_id = uuid.uuid4()
+        card = StatCardOut(
+            key="consistency", icon="calendar", label="Most consistent", value="3 of 7 days", detail="Simon",
+            image_url="/simon-solo",
+            candidates=[
+                StatCardCandidateOut(name="Simon", detail="Simon", image_url="/simon-solo"),
+                StatCardCandidateOut(name="Theo", detail="Theo", image_url="/theo-solo"),
+            ],
+        )
+        view = TeamView(members=[], highlights=HighlightsOut(window_days=7, total_km=10, total_runs=6, cards=[card]), facts={})
+        team = SimpleNamespace(id=team_id, name="Crew", race_name="Half",
+                               race_date=date(2027, 4, 4), race_distance_m=21097)
+        database = SimpleNamespace(get=AsyncMock(return_value=None))
+        with patch.object(teams, "_get_team", AsyncMock(return_value=team)), patch.object(
+            teams, "load_team_view", AsyncMock(return_value=view)
+        ), patch.object(teams.coach, "should_refresh", return_value=False), patch.object(
+            teams.coach, "coach_view", return_value=CoachOut(source="coach", generated_at=None, notes=[])
+        ), patch.object(teams.card_art, "should_refresh", return_value=False), patch.object(
+            teams.card_art, "group_art_status",
+            AsyncMock(return_value=({"consistency": "/simon-group"}, "signature", {})),
+        ), patch.object(teams.card_art, "should_refresh_group", return_value=False), patch.object(
+            teams.rig, "should_backfill", return_value=False
+        ):
+            response = asyncio.run(teams.get_team(team_id, BackgroundTasks(), None, database))
+        candidates = response.highlights.cards[0].candidates
+        self.assertEqual([c.image_url for c in candidates], ["/simon-group", "/theo-solo"])
+        self.assertEqual([c.image_url for c in card.candidates], ["/simon-solo", "/theo-solo"])
+
     def test_team_card_art_endpoint_serves_a_current_subject_image(self):
         team_id = uuid.uuid4()
         image_id = uuid.uuid4()

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./.test-dist/tsconfig.test.tsbuildinfo",
+    "rootDir": ".",
+    "outDir": "./.test-dist"
+  },
+  "include": ["tests/*.test.ts"]
+}

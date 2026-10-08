@@ -13,6 +13,7 @@ __pycache__/
 # Node / Vite
 frontend/node_modules/
 frontend/dist/
+frontend/.test-dist/
 
 # Environment — never commit secrets
 .env
