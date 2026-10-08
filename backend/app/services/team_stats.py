@@ -212,7 +212,7 @@ def stat_cards(
 
     ranked("steady_rhythm", "gauge", "Steady rhythm",
            {n: max(ps) - min(ps) for n, ps in paces.items() if len(ps) >= 2},
-           lambda spread: f"{spread}s /km spread", lowest=True)
+           lambda spread: f"{spread}s spread", lowest=True)
     weekend = {n: sum(r.distance_m for r in rs if run_day(r).weekday() >= 5) for n, rs in per_runner.items()}
     ranked("weekend", "calendar", "Weekend miles",
            {n: round(m / 1000, 1) for n, m in weekend.items() if m >= 100},

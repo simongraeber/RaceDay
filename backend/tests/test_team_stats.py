@@ -134,7 +134,7 @@ class TeamStatsTests(unittest.TestCase):
         }
         view = summarize(team(), [member(1, "Simon"), member(2, "Theo")], runs, NOW)
         cards = {c.key: c for c in view.highlights.cards}
-        self.assertEqual((cards["steady_rhythm"].value, cards["steady_rhythm"].detail), ("2s /km spread", "Theo X."))
+        self.assertEqual((cards["steady_rhythm"].value, cards["steady_rhythm"].detail), ("2s spread", "Theo X."))
         self.assertEqual((cards["weekend"].value, cards["weekend"].detail), ("12.0 km", "Theo X."))
         self.assertEqual((cards["quick_escape"].value, cards["quick_escape"].detail), ("25:00", "Simon X."))
         self.assertEqual(cards["comeback"].label, "Back on the road after")
