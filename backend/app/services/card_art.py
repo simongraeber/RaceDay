@@ -41,10 +41,25 @@ SOLO_PROMPTS = {
     "climber": "running steeply uphill, leaning forward, hands pushing on the thighs, cheeks puffed out",
     "kudos": "grinning beneath a shower of colorful heart-shaped confetti",
     "steady_rhythm": "running with an even, relaxed stride beside a playful metronome",
-    "weekend": "enjoying a relaxed weekend run under a little sun, cheerful and carefree",
-    "quick_escape": "dashing out for a short run, happily holding a tiny stopwatch",
-    "comeback": "eagerly tying running shoes after a break, ready to get moving again",
-    "latest": "finishing a fresh run with a cheerful wave and a triumphant smile",
+    "weekend": (
+        "running with wildly exaggerated knees-up strides, balancing a wobbling tower of pancakes "
+        "on a plate in one hand and a sloshing takeaway coffee in the other, a pancake flipping "
+        "into the air, delighted wide-eyed grin: squeezing a run in before weekend brunch"
+    ),
+    "quick_escape": (
+        "sneaking away from a tiny stopwatch with comically exaggerated tiptoe running strides, "
+        "finger to lips and a mischievous grin, shoelaces flying: a hilariously quick getaway"
+    ),
+    "comeback": (
+        "bursting out of an oversized pair of fluffy slippers left tumbling behind, running shoes "
+        "firmly on, doing an exuberant superhero-style running leap, a few cartoon dust puffs "
+        "shaking off the shoulders, proudly surprised expression: back after a sofa-powered break"
+    ),
+    "latest": (
+        "skidding to a triumphant halt after a run, dramatically presenting a tiny steaming "
+        "running shoe on an oversized silver serving platter, the other running shoe still on, "
+        "one socked foot lifted and an absurdly proud chef-like grin: a freshly served run"
+    ),
 }
 PROMPTS = {
     **SOLO_PROMPTS,

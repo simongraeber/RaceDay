@@ -36,6 +36,23 @@ def transparent_avatar() -> bytes:
 
 
 class AvatarTests(unittest.TestCase):
+    def test_new_cards_share_playful_prompts_across_both_generators(self):
+        for key, prop in {
+            "steady_rhythm": "metronome",
+            "weekend": "pancakes",
+            "quick_escape": "tiptoe",
+            "comeback": "slippers",
+            "latest": "serving platter",
+        }.items():
+            with self.subTest(card=key):
+                self.assertIn(prop, card_art.SOLO_PROMPTS[key])
+                self.assertEqual(card_art.PROMPTS[key], card_art.SOLO_PROMPTS[key])
+                generator = AsyncMock(return_value=b"art")
+                with patch.object(card_art, "generate", generator):
+                    image = asyncio.run(card_art.generate_solo_team_art(b"avatar", key))
+                self.assertEqual(image, b"art")
+                generator.assert_awaited_once_with(b"avatar", card_art.SOLO_PROMPTS[key])
+
     def test_team_response_keeps_tied_candidates_art_separate_and_cache_unchanged(self):
         team_id = uuid.uuid4()
         card = StatCardOut(

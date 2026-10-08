@@ -72,6 +72,8 @@ There is no official Strava MCP server. A small internal MCP server wrapping our
   1 km), Back out there (return after at least two full days without a run, using known history),
   and Latest outing (most recent UTC running date). Cards appear only when qualifying data exists;
   training-day and weekend boundaries use UTC.
+  New card artwork uses playful props and exaggerated cartoon poses; prompt updates affect
+  future generations only and do not automatically replace cached images.
 - AI recap of the week, per team and per athlete.
 - Share card (image) for WhatsApp / Instagram.
 
