@@ -137,7 +137,8 @@ class TeamStatsTests(unittest.TestCase):
         self.assertEqual((cards["steady_rhythm"].value, cards["steady_rhythm"].detail), ("2s /km spread", "Theo X."))
         self.assertEqual((cards["weekend"].value, cards["weekend"].detail), ("12.0 km", "Theo X."))
         self.assertEqual((cards["quick_escape"].value, cards["quick_escape"].detail), ("25:00", "Simon X."))
-        self.assertEqual((cards["comeback"].value, cards["comeback"].detail), ("5 days away", "Simon X."))
+        self.assertEqual(cards["comeback"].label, "Back on the road after")
+        self.assertEqual((cards["comeback"].value, cards["comeback"].detail), ("5 days off", "Simon X."))
         self.assertEqual((cards["latest"].value, cards["latest"].detail), ("30 Sep UTC", "Theo X."))
 
     def test_optional_cards_require_evidence(self):

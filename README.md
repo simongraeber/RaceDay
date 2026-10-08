@@ -69,7 +69,8 @@ There is no official Strava MCP server. A small internal MCP server wrapping our
   cached API responses do not freeze the selection. Artwork always belongs to the selected runner.
   Additional categories: Steady rhythm (smallest pace spread across at least two runs of 3 km or more),
   Weekend miles (Saturday/Sunday distance), Quick escape (shortest moving time for a run of at least
-  1 km), Back out there (return after at least two full days without a run, using known history),
+  1 km), Back on the road after (shows days off before returning, using known history and requiring
+  at least two full days without a run),
   and Latest outing (most recent UTC running date). Cards appear only when qualifying data exists;
   training-day and weekend boundaries use UTC.
   New card artwork uses playful props and exaggerated cartoon poses; prompt updates affect
