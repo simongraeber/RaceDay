@@ -139,7 +139,8 @@ class TeamStatsTests(unittest.TestCase):
         self.assertEqual((cards["quick_escape"].value, cards["quick_escape"].detail), ("25:00", "Simon X."))
         self.assertEqual(cards["comeback"].label, "Back on the road after")
         self.assertEqual((cards["comeback"].value, cards["comeback"].detail), ("5 days off", "Simon X."))
-        self.assertEqual((cards["latest"].value, cards["latest"].detail), ("30 Sep UTC", "Theo X."))
+        self.assertEqual(cards["latest"].label, "Freshest run")
+        self.assertEqual((cards["latest"].value, cards["latest"].detail), ("30 September", "Theo X."))
 
     def test_optional_cards_require_evidence(self):
         cards = {c.key: c for c in stat_cards({"Simon": [run(900, 200, 0)]}, 21097)}
@@ -156,7 +157,14 @@ class TeamStatsTests(unittest.TestCase):
         cards = {c.key: c for c in stat_cards({"Simon": [saturday_local, friday_utc]}, 21097)}
         self.assertNotIn("weekend", cards)
         self.assertEqual(cards["consistency"].value, "1 of 7 days")
-        self.assertEqual(cards["latest"].value, "25 Sep UTC")
+        self.assertEqual(cards["latest"].value, "25 September")
+
+    def test_freshest_run_uses_readable_date_without_leading_zero(self):
+        cards = {c.key: c for c in stat_cards({
+            "Simon": [Run(datetime(2026, 10, 7, 12, tzinfo=timezone.utc), 5000, 1500, 0, 0)],
+        }, 21097)}
+        self.assertEqual(cards["latest"].label, "Freshest run")
+        self.assertEqual(cards["latest"].value, "7 October")
 
     def test_comeback_does_not_invent_a_break_without_previous_runs(self):
         recent = {"Simon": [run(5000, 1500, 1)]}

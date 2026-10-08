@@ -234,9 +234,9 @@ def stat_cards(
         if breaks and max(breaks) >= 2:
             gaps[name] = max(breaks)
     ranked("comeback", "footprints", "Back on the road after", gaps, lambda days: f"{days} days off")
-    ranked("latest", "flag", "Latest outing",
+    ranked("latest", "flag", "Freshest run",
            {n: max(run_day(r) for r in rs) for n, rs in per_runner.items()},
-           lambda day: f"{day:%d %b} UTC")
+           lambda day: f"{day.day} {day:%B}")
 
     climbed = sum(r.elevation_m for _, r in runs)
     if climbed >= 1:
