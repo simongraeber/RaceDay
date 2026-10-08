@@ -1,14 +1,16 @@
 import asyncio
 import logging
 import math
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 from app.database import async_session
 from app.models import Activity, ActivityDetail, Athlete
 from app.services import strava, team_cache
+from app.services.heart_rate import usable_heart_rate
 from app.services.sync import TRIM_METERS, can_share_route
 
 log = logging.getLogger(__name__)
@@ -42,11 +44,19 @@ def trim_streams(raw: dict | None, meters: float = TRIM_METERS, max_points: int 
 
 def detail_values(detail: dict | None, streams: dict | None) -> dict:
     detail = detail or {}
+    average = detail.get("average_heartrate")
+    peak = detail.get("max_heartrate")
+    valid_hr = usable_heart_rate(average, peak)
+    if (average is not None or peak is not None) and not valid_hr:
+        log.warning("Ignoring incomplete or invalid activity heart-rate summary")
     return {
         "best_efforts": [{k: e.get(k) for k in EFFORT_FIELDS} for e in detail.get("best_efforts") or []] or None,
         "splits": [{k: s.get(k) for k in SPLIT_FIELDS} for s in detail.get("splits_metric") or []] or None,
         "kudos_count": detail.get("kudos_count") or 0,
         "pr_count": detail.get("pr_count") or 0,
+        "average_heartrate": average if valid_hr else None,
+        "max_heartrate": peak if valid_hr else None,
+        "heart_rate_checked": True,
         "streams": trim_streams(streams),
     }
 
@@ -59,7 +69,13 @@ async def enrich_batch(limit: int = BATCH) -> int:
             await db.execute(
                 select(Activity.id, Activity.athlete_id)
                 .outerjoin(ActivityDetail, ActivityDetail.activity_id == Activity.id)
-                .where(ActivityDetail.activity_id.is_(None))
+                .where(or_(
+                    ActivityDetail.activity_id.is_(None),
+                    and_(
+                        ActivityDetail.heart_rate_checked.is_(False),
+                        Activity.start_date >= datetime.now(timezone.utc) - timedelta(days=84),
+                    ),
+                ))
                 .order_by(Activity.start_date.desc())
                 .limit(limit)
             )
@@ -87,11 +103,14 @@ async def enrich_batch(limit: int = BATCH) -> int:
                 log.warning("Enriching activity %s failed", activity_id, exc_info=True)
                 continue
             try:
-                await db.execute(
-                    insert(ActivityDetail)
-                    .values(activity_id=activity_id, **detail_values(detail, streams))
-                    .on_conflict_do_nothing(index_elements=[ActivityDetail.activity_id])
-                )
+                values = detail_values(detail, streams)
+                stmt = insert(ActivityDetail).values(activity_id=activity_id, **values)
+                await db.execute(stmt.on_conflict_do_update(
+                    index_elements=[ActivityDetail.activity_id],
+                    set_={key: stmt.excluded[key] for key in (
+                        "average_heartrate", "max_heartrate", "heart_rate_checked",
+                    )},
+                ))
                 await db.commit()
                 stored += 1
             except IntegrityError:

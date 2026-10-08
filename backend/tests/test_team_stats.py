@@ -1,8 +1,11 @@
 import unittest
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
+from sqlalchemy.dialects import postgresql
 from app.models import Athlete, Membership, Team
+from app.services import enrich
 from app.services.enrich import detail_values, trim_streams
 from app.services.sync import can_share_route
 from app.services.team_stats import Run, pace_seconds_km, predict_finish, race_efforts, stat_cards, summarize
@@ -10,8 +13,14 @@ from app.services.team_stats import Run, pace_seconds_km, predict_finish, race_e
 NOW = datetime(2026, 9, 30, 12, tzinfo=timezone.utc)  # a Wednesday
 
 
-def run(distance: float, seconds: int, days_ago: float = 0, efforts: list[dict] | None = None) -> Run:
-    return Run(NOW - timedelta(days=days_ago), distance, seconds, 40, 2, efforts or [])
+def run(
+    distance: float, seconds: int, days_ago: float = 0, efforts: list[dict] | None = None,
+    average_hr: float | None = None, max_hr: float | None = None,
+) -> Run:
+    return Run(
+        NOW - timedelta(days=days_ago), distance, seconds, 40, 2, efforts or [],
+        average_heartrate=average_hr, max_heartrate=max_hr,
+    )
 
 
 def team(race_date: date = date(2027, 4, 4)) -> Team:
@@ -62,6 +71,61 @@ class TeamStatsTests(unittest.TestCase):
         )
         self.assertEqual([(m, s) for m, s, _ in efforts], [(12000, 3900), (10000, 3000)])
         self.assertEqual([round(age) for *_, age in efforts], [1, 1])
+
+    def test_easy_run_heart_rate_allowance_is_capped_at_two_percent(self):
+        runs = [run(10000, 3000, day, average_hr=135, max_hr=180) for day in range(3)]
+        adjusted = predict_finish(race_efforts(runs, NOW), 21097, 45, 18000)
+        baseline = predict_finish([(10000, 3000, day) for day in range(3)], 21097, 45, 18000)
+        self.assertAlmostEqual(adjusted / baseline, 0.98, delta=0.0002)
+        view = summarize(team(), [member(1, "Simon")], {1: runs}, NOW)
+        self.assertTrue(view.members[0][1].has_heart_rate_data)
+        self.assertLess(view.members[0][1].prediction_seconds,
+                        predict_finish([(10000, 3000, day) for day in range(3)], 21097, 7.5, 10000))
+        self.assertNotIn("average_heartrate", view.members[0][1].model_dump())
+        self.assertNotIn("max_heartrate", view.facts[1])
+
+    def test_heart_rate_allowance_scales_without_changing_hard_efforts(self):
+        for average, expected in [(144, 2970), (153, 3000), (170, 3000)]:
+            with self.subTest(average=average):
+                runs = [run(10000, 3000, day, average_hr=average, max_hr=180) for day in range(3)]
+                self.assertAlmostEqual(race_efforts(runs, NOW)[0][1], expected)
+
+    def test_missing_sparse_stale_short_and_invalid_hr_leave_estimates_unchanged(self):
+        cases = [
+            [run(10000, 3000, day) for day in range(3)],
+            [run(10000, 3000, day, average_hr=135, max_hr=180) for day in range(2)],
+            [run(10000, 3000, average_hr=135, max_hr=180),
+             run(10000, 3000, 85, average_hr=135, max_hr=180),
+             run(10000, 3000, 86, average_hr=135, max_hr=180)],
+            [run(10000, 3000), *[run(1000, 300, day, average_hr=135, max_hr=180) for day in range(3)]],
+        ]
+        for average, peak in [(None, 180), (150, None), (190, 180), (0, 180),
+                              (150, 250), (float("nan"), 180), (150, float("inf"))]:
+            cases.append([run(10000, 3000, day, average_hr=average, max_hr=peak) for day in range(3)])
+        for runs in cases:
+            with self.subTest(runs=runs):
+                self.assertEqual(
+                    race_efforts(runs, NOW),
+                    [(r.distance_m, r.moving_time_s, (NOW - r.start).total_seconds() / 86400)
+                     for r in runs if r.start >= NOW - timedelta(days=84)],
+                )
+
+    def test_full_run_hr_never_adjusts_best_effort_segments(self):
+        runs = [run(10000, 3000, day, [{"distance": 5000, "elapsed_time": 1400}],
+                    average_hr=135, max_hr=180) for day in range(3)]
+        efforts = race_efforts(runs, NOW)
+        self.assertEqual([seconds for meters, seconds, _ in efforts if meters == 5000], [1400] * 3)
+        self.assertEqual([seconds for meters, seconds, _ in efforts if meters == 10000], [2940] * 3)
+
+    def test_heart_rate_hint_uses_only_valid_recent_summaries(self):
+        runs = {
+            1: [run(10000, 3000, average_hr=150, max_hr=180)],
+            2: [run(10000, 3000, 85, average_hr=150, max_hr=180)],
+            3: [run(10000, 3000)],
+            4: [run(10000, 3000, average_hr=190, max_hr=180)],
+        }
+        view = summarize(team(), [member(i, f"Runner{i}") for i in runs], runs, NOW)
+        self.assertEqual([m.has_heart_rate_data for _, m in view.members], [True, False, False, False])
 
     def test_rolling_seven_day_cards(self):
         runs = {
@@ -211,13 +275,58 @@ class EnrichTests(unittest.TestCase):
     def test_detail_values_keep_only_whitelisted_fields(self):
         values = detail_values(
             {"best_efforts": [{"name": "1k", "distance": 1000, "elapsed_time": 250, "athlete": {"id": 1}}],
-             "average_heartrate": 150, "kudos_count": 3},
+             "average_heartrate": 150, "max_heartrate": 180, "kudos_count": 3},
             None,
         )
         self.assertEqual(values["best_efforts"], [{"name": "1k", "distance": 1000, "elapsed_time": 250, "moving_time": None, "pr_rank": None}])
         self.assertEqual(values["kudos_count"], 3)
-        self.assertNotIn("average_heartrate", values)
+        self.assertEqual((values["average_heartrate"], values["max_heartrate"]), (150, 180))
+        self.assertTrue(values["heart_rate_checked"])
         self.assertEqual(detail_values(None, None)["best_efforts"], None)
+
+    def test_invalid_or_missing_heart_rate_is_not_stored(self):
+        for detail in ({}, {"average_heartrate": 150}, {"average_heartrate": 190, "max_heartrate": 180},
+                       {"average_heartrate": "150", "max_heartrate": 180}):
+            with self.subTest(detail=detail):
+                values = detail_values(detail, None)
+                self.assertIsNone(values["average_heartrate"])
+                self.assertIsNone(values["max_heartrate"])
+                self.assertTrue(values["heart_rate_checked"])
+
+
+class EnrichBatchTests(unittest.IsolatedAsyncioTestCase):
+    async def test_recent_existing_details_are_rechecked_and_keep_other_fields(self):
+        for detail in ({"average_heartrate": 150, "max_heartrate": 180, "visibility": "only_me"}, None):
+            with self.subTest(detail=detail):
+                db = AsyncMock()
+                pending = MagicMock()
+                pending.all.return_value = [(101, 1)]
+                db.execute.side_effect = [pending, None]
+                session = MagicMock()
+                session.return_value.__aenter__ = AsyncMock(return_value=db)
+                session.return_value.__aexit__ = AsyncMock(return_value=False)
+                with (patch.object(enrich, "async_session", session),
+                      patch.object(enrich.strava, "read_budget_ok", return_value=True),
+                      patch.object(enrich.strava, "get_access_token", AsyncMock(return_value="test-token")),
+                      patch.object(enrich.strava, "get_activity", AsyncMock(return_value=detail)),
+                      patch.object(enrich.strava, "get_activity_streams", AsyncMock()) as streams,
+                      patch.object(enrich.team_cache, "clear") as clear):
+                    self.assertEqual(await enrich.enrich_batch(), 1)
+                    streams.assert_not_awaited()
+                    clear.assert_called_once()
+                select_stmt = db.execute.call_args_list[0].args[0]
+                query = str(select_stmt.compile(dialect=postgresql.dialect()))
+                self.assertIn("activity_details.heart_rate_checked IS false", query)
+                self.assertIn("activities.start_date >=", query)
+                insert_stmt = db.execute.call_args_list[1].args[0]
+                compiled = insert_stmt.compile(dialect=postgresql.dialect())
+                updates = str(compiled).split("DO UPDATE SET")[1]
+                self.assertIn("heart_rate_checked = excluded.heart_rate_checked", updates)
+                self.assertNotIn("best_efforts", updates)
+                self.assertNotIn("streams", updates)
+                self.assertEqual(compiled.params["average_heartrate"], 150 if detail else None)
+                self.assertTrue(compiled.params["heart_rate_checked"])
+                db.commit.assert_awaited_once()
 
 
 if __name__ == "__main__":

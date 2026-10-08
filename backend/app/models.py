@@ -116,7 +116,10 @@ class ActivityDetail(Base):
     splits: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     kudos_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     pr_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    # Trimmed + downsampled latlng/altitude/distance/time; heart rate is never stored
+    average_heartrate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_heartrate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    heart_rate_checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Trimmed + downsampled latlng/altitude/distance/time; no heart-rate streams
     streams: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 

@@ -37,6 +37,10 @@ export default function NewTeamPage() {
     return (
       <PageTransition className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
         <h1 className="text-2xl font-bold">Connect Strava to create a team</h1>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Available average and maximum heart rate are used privately to refine your race estimate.
+          Your team only sees whether recent heart-rate data is available, not the readings.
+        </p>
         <StravaConnectButton href={stravaLoginUrl("create")} />
       </PageTransition>
     )

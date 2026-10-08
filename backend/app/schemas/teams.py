@@ -39,6 +39,7 @@ class MemberOut(BaseModel):
     runs_7d: int
     last_4_weeks_km: float
     prediction_seconds: int | None
+    has_heart_rate_data: bool = False
     best_km_seconds: int | None
     recent_runs: list[RunOut]
 

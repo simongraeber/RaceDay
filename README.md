@@ -129,16 +129,23 @@ Open team link
 Two layers, kept deliberately simple:
 
 1. **Deterministic baseline** — Riegel on the athlete's efforts of the last 12 weeks (whole runs plus Strava best efforts,
-   5 km + and at most 4× extrapolation). Plain Riegel with `b = 1.06` is fitted to races at similar distances and is
+   5 km + and at most 5× extrapolation). Plain Riegel with `b = 1.06` is fitted to races at similar distances and is
    famously optimistic when projecting far, and it assumes race-specific endurance training — so we damp it:
-   - the exponent grows with the extrapolation factor (`1.06 + 0.03 · log₂(ratio)`, capped at `1.15`),
-   - up to +12 % when the longest run and weekly volume fall short of the race (target: longest run ≥ 80 % of the race
+   - the exponent grows with the extrapolation factor (`1.06 + 0.005 · log₂(ratio)`, capped at `1.08`),
+   - up to +6 % when the longest run and weekly volume fall short of the race (target: longest run ≥ 80 % of the race
      distance, weekly volume ≥ 2× the race distance),
    - up to +5 % for efforts older than four weeks,
    - the shown time is the **median of the three best** projections, so one lucky downhill run cannot set the goal.
 
-   A half marathon projected from a hard 6 km therefore lands ~7–11 % slower than plain Riegel, while a recent 16 km
-   long run barely moves. This is the number shown.
+   Heart-rate summaries add a deliberately small easy-run allowance: after at least three runs of 20 minutes
+   with valid average/maximum HR in the same 12-week window, whole runs averaging below 85% of the athlete's
+   highest observed peak get up to 2% less projected time (the full allowance at 75% or below). Observed peaks
+   are not treated as a measured physiological maximum. Hard runs and Strava best-effort segments are unchanged;
+   missing or invalid HR leaves the original estimate unchanged. This is a conservative heuristic, not a
+   validated physiological model or an attempt to reproduce Strava's predictor.
+   Runner cards show a broken-heart hint when there are no usable recent HR summaries. Readings remain
+   backend-only and are not sent to AI services; only their availability is exposed.
+   Existing runs from the last 12 weeks are re-enriched by the rate-limited background worker after upgrade.
 2. **LLM layer** — gets the computed stats as structured input and produces the *explanation*, the tone, and the motivation ("you need three more long runs to hold sub-1:50"). It never invents the time.
 
 This keeps predictions defensible and cheap, and keeps the LLM doing what it's good at.
@@ -188,7 +195,7 @@ Athlete (strava_id, name, avatar, scope, refresh_token_enc, access_token_enc, ex
   └── CardImage (athlete_id, card_key, uuid, image)  -- avatar restyled per highlight card, generated once
   └── Activity (athlete_id, strava_id, start_date, distance, moving_time,
                 elevation, summary_polyline)  -- public runs only, start/end trimmed
-        └── ActivityDetail (best_efforts, splits, kudos, pr_count, streams)  -- trimmed, no heart rate
+        └── ActivityDetail (best_efforts, splits, kudos, pr_count, HR summaries, streams)  -- trimmed, no HR streams
 TeamCoachNote (team_id, generated_at, notes)  -- AI roasts, refreshed ≤ every 12 h
 ```
 
