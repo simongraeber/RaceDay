@@ -8,8 +8,6 @@ import { loadMapkit } from "@/lib/mapkit"
 // Everyone runs 30x real time so a Sunday long run fits into a minute
 const SPEED = 30
 const FRAME_MS = 40
-// Home turf: the map opens here unless the team's routes are somewhere else entirely
-const HOME = { north: 48.28162846561217, west: 11.472049612467698, south: 48.054257854159516, east: 11.730924273482833 }
 
 function chooseRoute(routes: MapRoute[], previousIndex = -1): { route: MapRoute; index: number } {
   const options = routes.map((route, index) => ({ route, index })).filter(({ index }) => index !== previousIndex)
@@ -32,14 +30,6 @@ type MovingSprite = {
   lengths: number[]
   duration: number
   startedAt: number
-}
-
-function homeShare(paths: [number, number][][]): number {
-  const points = paths.flat()
-  const local = points.filter(
-    ([lat, lng]) => lat <= HOME.north && lat >= HOME.south && lng >= HOME.west && lng <= HOME.east,
-  )
-  return points.length ? local.length / points.length : 0
 }
 
 function legLengths(path: [number, number][]): number[] {
@@ -92,12 +82,7 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
         kit = mapkit
         onError = () => setFailed(true)
         mapkit.addEventListener("error", onError)
-        // Holiday runs abroad must not zoom the map out to the whole globe
-        const atHome = homeShare(data.heat) >= 0.1
         map = new mapkit.Map(container.current, {
-          region: atHome
-            ? new mapkit.BoundingRegion(HOME.north, HOME.east, HOME.south, HOME.west).toCoordinateRegion()
-            : undefined,
           showsCompass: mapkit.FeatureVisibility.Hidden,
           showsZoomControl: true,
           showsMapTypeControl: false,
@@ -123,9 +108,19 @@ export default function TrainingMap({ teamId }: { teamId: string }) {
             ),
         )
         map.addOverlays(heat)
-        if (!atHome) {
-          map.showItems(heat, { animate: false, padding: new mapkit.Padding(32, 32, 32, 32) })
-        }
+        const recentRoutes = data.tracks.flatMap((track) =>
+          (track.routes?.length ? track.routes : [track]).map(
+            (route) =>
+              new mapkit.PolylineOverlay(
+                route.path.map(([lat, lng]) => new mapkit.Coordinate(lat, lng)),
+                { style: new mapkit.Style({ lineWidth: 1, strokeOpacity: 0 }) },
+              ),
+          ),
+        )
+        map.showItems(recentRoutes.length ? recentRoutes : heat, {
+          animate: false,
+          padding: new mapkit.Padding(32, 32, 32, 32),
+        })
 
         const sprites: MovingSprite[] = data.tracks.map((track: Track) => {
           const routes = track.routes?.length ? track.routes : [track]
