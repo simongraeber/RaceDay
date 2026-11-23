@@ -1,2 +1,13 @@
 node_modules
 dist
+
+# Keep local environments and credentials out of build contexts.
+.git
+node_modules
+venv
+.venv
+__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
